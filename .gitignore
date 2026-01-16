@@ -1,0 +1,193 @@
+# ==============================================================================
+# Federated Learning Traffic Signal Control - Git Ignore
+# ==============================================================================
+
+# ==============================================================================
+# Python
+# ==============================================================================
+# Virtual environment
+venv/
+env/
+.venv/
+.env/
+ENV/
+
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+
+# Distribution / packaging
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# PyInstaller
+*.manifest
+*.spec
+
+# Installer logs
+pip-log.txt
+pip-delete-this-directory.txt
+
+# Unit test / coverage reports
+htmlcov/
+.tox/
+.nox/
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+*.py,cover
+.hypothesis/
+.pytest_cache/
+
+# Translations
+*.mo
+*.pot
+
+# Jupyter Notebook
+.ipynb_checkpoints/
+
+# pyenv
+.python-version
+
+# mypy
+.mypy_cache/
+.dmypy.json
+dmypy.json
+
+# ==============================================================================
+# Java / Maven (CloudSim)
+# ==============================================================================
+cloudsim/target/
+*.class
+*.jar
+*.war
+*.ear
+*.nar
+hs_err_pid*
+
+# ==============================================================================
+# IDE and Editors
+# ==============================================================================
+# VS Code
+.vscode/
+*.code-workspace
+
+# PyCharm / IntelliJ
+.idea/
+*.iml
+*.iws
+*.ipr
+out/
+
+# Eclipse
+.project
+.classpath
+.settings/
+.metadata/
+
+# Sublime Text
+*.sublime-project
+*.sublime-workspace
+
+# Vim
+*.swp
+*.swo
+*~
+.netrwhist
+
+# Emacs
+*~
+\#*\#
+/.emacs.desktop
+/.emacs.desktop.lock
+*.elc
+auto-save-list
+tramp
+
+# ==============================================================================
+# Operating System
+# ==============================================================================
+# Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+*.lnk
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+.Spotlight-V100
+.Trashes
+
+# Linux
+*~
+.fuse_hidden*
+.Trash-*
+.nfs*
+
+# ==============================================================================
+# Project Specific
+# ==============================================================================
+# Logs
+*.log
+logs/
+results/comprehensive/logs/
+
+# Temporary files
+*.tmp
+*.temp
+*.bak
+
+# Large data files (optional - uncomment if needed)
+# data/*.csv
+
+# Model checkpoints (can be large)
+*.pt
+*.pth
+*.pkl
+checkpoints/
+
+# Downloaded files
+maven.zip
+apache-maven-*/
+
+# Secrets / credentials (if any)
+.env.local
+.env.*.local
+secrets.yaml
+credentials.json
+
+# ==============================================================================
+# Docker (keep Dockerfile and docker-compose.yml)
+# ==============================================================================
+# Docker build cache
+.docker/
+
+# ==============================================================================
+# Keep these files (use ! to negate)
+# ==============================================================================
+!.gitkeep
+!requirements.txt
+!Dockerfile
+!docker-compose.yml

@@ -1,0 +1,186 @@
+# ==============================================================================
+# Federated Learning Traffic Signal Control - Docker Compose
+# ==============================================================================
+# Usage:
+#   docker-compose up demo              # Run comprehensive demo
+#   docker-compose up fl-training       # Run FL server + clients
+#   docker-compose up --build           # Rebuild and run
+# ==============================================================================
+
+version: '3.8'
+
+services:
+  # ==========================================================================
+  # DEMO SERVICE - Runs comprehensive experiment (one command!)
+  # ==========================================================================
+  demo:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: traffic-fl-demo
+    volumes:
+      - ./results:/app/results
+      - ./data:/app/data
+    environment:
+      - PYTHONPATH=/app/src
+      - EXPERIMENT_SEED=42
+    command: python run_comprehensive.py --quick
+    networks:
+      - fl-network
+
+  # ==========================================================================
+  # FULL EXPERIMENT - Runs complete experiment with scalability tests
+  # ==========================================================================
+  full-experiment:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: traffic-fl-full
+    volumes:
+      - ./results:/app/results
+      - ./data:/app/data
+    environment:
+      - PYTHONPATH=/app/src
+      - EXPERIMENT_SEED=42
+    command: python run_comprehensive.py
+    networks:
+      - fl-network
+
+  # ==========================================================================
+  # TRAFFIC SIMULATION ONLY
+  # ==========================================================================
+  simulation:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: traffic-simulation
+    volumes:
+      - ./results:/app/results
+      - ./data:/app/data
+    command: python run_simulation.py
+    networks:
+      - fl-network
+
+  # ==========================================================================
+  # FEDERATED LEARNING SERVER
+  # ==========================================================================
+  fl-server:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: fl-server
+    ports:
+      - "8080:8080"
+    environment:
+      - PYTHONPATH=/app/src
+      - FL_SERVER_ADDRESS=0.0.0.0:8080
+    command: python run_fl_server.py --address 0.0.0.0:8080 --rounds 20 --min-clients 2
+    networks:
+      - fl-network
+    healthcheck:
+      test: ["CMD", "python", "-c", "import socket; s=socket.socket(); s.connect(('localhost',8080)); s.close()"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ==========================================================================
+  # FEDERATED LEARNING CLIENTS (Edge Nodes / Intersections)
+  # ==========================================================================
+  fl-client-0:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: fl-client-0
+    environment:
+      - PYTHONPATH=/app/src
+      - FL_SERVER_ADDRESS=fl-server:8080
+      - INTERSECTION_ID=0
+    command: python run_fl_client.py --server fl-server:8080 --intersection 0
+    depends_on:
+      fl-server:
+        condition: service_healthy
+    networks:
+      - fl-network
+    restart: on-failure
+
+  fl-client-1:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: fl-client-1
+    environment:
+      - PYTHONPATH=/app/src
+      - FL_SERVER_ADDRESS=fl-server:8080
+      - INTERSECTION_ID=1
+    command: python run_fl_client.py --server fl-server:8080 --intersection 1
+    depends_on:
+      fl-server:
+        condition: service_healthy
+    networks:
+      - fl-network
+    restart: on-failure
+
+  fl-client-2:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: fl-client-2
+    environment:
+      - PYTHONPATH=/app/src
+      - FL_SERVER_ADDRESS=fl-server:8080
+      - INTERSECTION_ID=2
+    command: python run_fl_client.py --server fl-server:8080 --intersection 2
+    depends_on:
+      fl-server:
+        condition: service_healthy
+    networks:
+      - fl-network
+    restart: on-failure
+
+  fl-client-3:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: fl-client-3
+    environment:
+      - PYTHONPATH=/app/src
+      - FL_SERVER_ADDRESS=fl-server:8080
+      - INTERSECTION_ID=3
+    command: python run_fl_client.py --server fl-server:8080 --intersection 3
+    depends_on:
+      fl-server:
+        condition: service_healthy
+    networks:
+      - fl-network
+    restart: on-failure
+
+  # ==========================================================================
+  # CLOUDSIM SIMULATION
+  # ==========================================================================
+  cloudsim:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: traffic-cloudsim
+    volumes:
+      - ./results:/app/results
+    command: python run_cloudsim.py
+    networks:
+      - fl-network
+
+# ==========================================================================
+# NETWORKS
+# ==========================================================================
+networks:
+  fl-network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.28.0.0/16
+
+# ==========================================================================
+# VOLUMES (for persistent data)
+# ==========================================================================
+volumes:
+  results-data:
+  simulation-data:

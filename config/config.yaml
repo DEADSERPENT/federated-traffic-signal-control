@@ -1,0 +1,65 @@
+# Federated Learning-based Adaptive Traffic Signal Control System
+# Configuration File
+
+# Traffic Simulation Settings
+traffic:
+  num_intersections: 4
+  simulation_duration: 3600  # seconds (1 hour)
+  time_step: 5  # seconds
+
+  # Vehicle arrival parameters
+  arrival_distribution: "poisson"  # "poisson" or "uniform"
+  min_arrival_rate: 5  # vehicles per minute
+  max_arrival_rate: 30  # vehicles per minute
+
+  # Queue parameters
+  max_queue_length: 50
+
+  # Signal parameters
+  min_green_duration: 10  # seconds
+  max_green_duration: 90  # seconds
+  yellow_duration: 3  # seconds
+
+# Federated Learning Settings
+federated_learning:
+  num_rounds: 50
+  local_epochs: 5
+  batch_size: 32
+  learning_rate: 0.01
+
+  # Server settings
+  server_address: "localhost:8080"
+  min_clients: 2
+  fraction_fit: 1.0
+  fraction_evaluate: 1.0
+
+# Model Settings
+model:
+  type: "neural_network"  # "linear_regression" or "neural_network"
+  hidden_layers: [64, 32]
+  activation: "relu"
+  output_activation: "linear"
+
+# Network Simulation Settings
+network:
+  base_latency: 10  # milliseconds
+  bandwidth: 100  # Mbps
+  packet_loss_probability: 0.01
+  jitter_range: 5  # milliseconds
+
+# CloudSim Settings
+cloudsim:
+  edge_vm_mips: 1000
+  edge_vm_ram: 512  # MB
+  edge_vm_bandwidth: 1000  # Mbps
+
+  cloud_datacenter_hosts: 4
+  cloud_host_mips: 10000
+  cloud_host_ram: 8192  # MB
+
+# Output Settings
+output:
+  save_metrics: true
+  save_models: true
+  visualization: true
+  results_dir: "results"

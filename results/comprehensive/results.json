@@ -1,0 +1,954 @@
+{
+  "metadata": {
+    "timestamp": "2026-01-16T18:38:48.316407",
+    "seed": 42,
+    "num_intersections": 4,
+    "simulation_duration": 1800,
+    "fl_rounds": 30
+  },
+  "fixed_time": {
+    "method": "Fixed-Time",
+    "avg_waiting_time": 13.345536428658182,
+    "avg_queue_length": 20.064583333333335,
+    "total_throughput": 10169,
+    "throughput_per_hour": 20338.0,
+    "step_metrics": "... (truncated for brevity)",
+    "config": {
+      "green_ns": 30,
+      "green_ew": 30,
+      "cycle_length": 66
+    }
+  },
+  "local_ml": {
+    "method": "Local-ML",
+    "avg_waiting_time": 9.715777449721681,
+    "avg_queue_length": 14.640277777777778,
+    "total_throughput": 10178,
+    "throughput_per_hour": 20356.0,
+    "mse": 102.66053581237793,
+    "mae": 7.273139119148254,
+    "step_metrics": "... (truncated for brevity)",
+    "training_history": {
+      "0": [
+        236.30852842330933,
+        132.53058767318726,
+        106.81248021125793,
+        105.4846134185791,
+        111.49567914009094,
+        119.37157917022705,
+        113.97964906692505,
+        111.9054069519043,
+        114.02187037467957,
+        113.42962050437927
+      ],
+      "1": [
+        222.3798360824585,
+        118.3569564819336,
+        122.45041942596436,
+        116.72498846054077,
+        113.56204748153687,
+        106.35813975334167,
+        114.13022065162659,
+        117.75585126876831,
+        111.3896152973175,
+        118.44705390930176
+      ],
+      "2": [
+        263.3205795288086,
+        132.78196239471436,
+        126.90088677406311,
+        110.0064640045166,
+        108.46861147880554,
+        110.20217752456665,
+        115.93871831893921,
+        111.06614780426025,
+        110.20034980773926,
+        115.02499866485596
+      ],
+      "3": [
+        290.35992336273193,
+        130.14647006988525,
+        127.31126737594604,
+        121.30838060379028,
+        121.02182173728943,
+        115.415611743927,
+        117.97640562057495,
+        123.87457227706909,
+        121.0669093132019,
+        122.2934250831604
+      ]
+    }
+  },
+  "federated_learning": {
+    "method": "Federated-Learning",
+    "avg_waiting_time": 12.143165784938871,
+    "avg_queue_length": 20.252777777777776,
+    "total_throughput": 10147,
+    "throughput_per_hour": 20294.0,
+    "mse": 109.22249031066895,
+    "mae": 6.492492914199829,
+    "step_metrics": "... (truncated for brevity)",
+    "round_metrics": [
+      {
+        "round": 1,
+        "avg_local_loss": 115.96711444854736,
+        "global_mse": 106.12519073486328,
+        "global_mae": 7.42544686794281
+      },
+      {
+        "round": 2,
+        "avg_local_loss": 111.9362322986126,
+        "global_mse": 113.42498779296875,
+        "global_mae": 7.479257941246033
+      },
+      {
+        "round": 3,
+        "avg_local_loss": 111.23718917369843,
+        "global_mse": 112.82134437561035,
+        "global_mae": 7.3574378490448
+      },
+      {
+        "round": 4,
+        "avg_local_loss": 112.15065759420395,
+        "global_mse": 106.25424766540527,
+        "global_mae": 7.130695104598999
+      },
+      {
+        "round": 5,
+        "avg_local_loss": 112.14907044172287,
+        "global_mse": 104.62659454345703,
+        "global_mae": 7.032230257987976
+      },
+      {
+        "round": 6,
+        "avg_local_loss": 105.65504217147827,
+        "global_mse": 105.94214057922363,
+        "global_mae": 7.047879576683044
+      },
+      {
+        "round": 7,
+        "avg_local_loss": 110.94605457782745,
+        "global_mse": 104.33953285217285,
+        "global_mae": 7.113181233406067
+      },
+      {
+        "round": 8,
+        "avg_local_loss": 108.4871991276741,
+        "global_mse": 106.36828231811523,
+        "global_mae": 6.935860872268677
+      },
+      {
+        "round": 9,
+        "avg_local_loss": 104.16001403331757,
+        "global_mse": 104.32728004455566,
+        "global_mae": 6.894554018974304
+      },
+      {
+        "round": 10,
+        "avg_local_loss": 108.1990812420845,
+        "global_mse": 104.70508575439453,
+        "global_mae": 6.939340353012085
+      },
+      {
+        "round": 11,
+        "avg_local_loss": 108.27489793300629,
+        "global_mse": 109.08495712280273,
+        "global_mae": 6.921578288078308
+      },
+      {
+        "round": 12,
+        "avg_local_loss": 110.0144944190979,
+        "global_mse": 107.40527153015137,
+        "global_mae": 6.934942126274109
+      },
+      {
+        "round": 13,
+        "avg_local_loss": 109.07807922363281,
+        "global_mse": 106.1978530883789,
+        "global_mae": 6.805203676223755
+      },
+      {
+        "round": 14,
+        "avg_local_loss": 107.2647693157196,
+        "global_mse": 107.51096725463867,
+        "global_mae": 6.846314787864685
+      },
+      {
+        "round": 15,
+        "avg_local_loss": 103.56031024456024,
+        "global_mse": 105.44843292236328,
+        "global_mae": 6.719787359237671
+      },
+      {
+        "round": 16,
+        "avg_local_loss": 109.3658459186554,
+        "global_mse": 107.37628173828125,
+        "global_mae": 6.819042682647705
+      },
+      {
+        "round": 17,
+        "avg_local_loss": 107.47081911563873,
+        "global_mse": 106.8225269317627,
+        "global_mae": 6.758068799972534
+      },
+      {
+        "round": 18,
+        "avg_local_loss": 105.46757477521896,
+        "global_mse": 106.33038139343262,
+        "global_mae": 6.64988648891449
+      },
+      {
+        "round": 19,
+        "avg_local_loss": 102.0203418135643,
+        "global_mse": 106.4881477355957,
+        "global_mae": 6.647635817527771
+      },
+      {
+        "round": 20,
+        "avg_local_loss": 107.42329761385918,
+        "global_mse": 106.70171546936035,
+        "global_mae": 6.5504924058914185
+      },
+      {
+        "round": 21,
+        "avg_local_loss": 105.5293316245079,
+        "global_mse": 106.23707962036133,
+        "global_mae": 6.545449376106262
+      },
+      {
+        "round": 22,
+        "avg_local_loss": 108.49646657705307,
+        "global_mse": 105.97099113464355,
+        "global_mae": 6.544652342796326
+      },
+      {
+        "round": 23,
+        "avg_local_loss": 100.22683656215668,
+        "global_mse": 108.56680297851562,
+        "global_mae": 6.439539313316345
+      },
+      {
+        "round": 24,
+        "avg_local_loss": 100.60356372594833,
+        "global_mse": 107.7946720123291,
+        "global_mae": 6.62136971950531
+      },
+      {
+        "round": 25,
+        "avg_local_loss": 101.79409629106522,
+        "global_mse": 107.0417366027832,
+        "global_mae": 6.490770220756531
+      },
+      {
+        "round": 26,
+        "avg_local_loss": 102.69912549853325,
+        "global_mse": 107.4170093536377,
+        "global_mae": 6.486414790153503
+      },
+      {
+        "round": 27,
+        "avg_local_loss": 104.45201045274734,
+        "global_mse": 107.78351402282715,
+        "global_mae": 6.433230638504028
+      },
+      {
+        "round": 28,
+        "avg_local_loss": 100.59014439582825,
+        "global_mse": 106.79364967346191,
+        "global_mae": 6.54283332824707
+      },
+      {
+        "round": 29,
+        "avg_local_loss": 104.94233113527298,
+        "global_mse": 109.39160346984863,
+        "global_mae": 6.505879163742065
+      },
+      {
+        "round": 30,
+        "avg_local_loss": 100.55444073677063,
+        "global_mse": 107.0849781036377,
+        "global_mae": 6.4910255670547485
+      }
+    ],
+    "num_rounds": 30,
+    "convergence_metrics": {
+      "convergence_rate": 10.887239883402309,
+      "final_stability": 0.05300929122339098,
+      "rounds_to_90_percent": 20,
+      "initial_mae": 7.42544686794281,
+      "final_mae": 6.4910255670547485,
+      "total_improvement": 12.584041304263472
+    }
+  },
+  "network_stress": {
+    "ideal": {
+      "scenario": "ideal",
+      "network_config": {
+        "base_latency": 5,
+        "bandwidth": 100,
+        "packet_loss_probability": 0.0,
+        "jitter_range": 2
+      },
+      "round_metrics": [
+        {
+          "round": 1,
+          "mse": 106.57861328125,
+          "mae": 7.46785044670105,
+          "comm_time_ms": 56.05415904557654,
+          "successful_clients": 4
+        },
+        {
+          "round": 2,
+          "mse": 106.23884773254395,
+          "mae": 7.419252395629883,
+          "comm_time_ms": 51.06710655589437,
+          "successful_clients": 4
+        },
+        {
+          "round": 3,
+          "mse": 110.77958869934082,
+          "mae": 7.401240825653076,
+          "comm_time_ms": 56.76928753511456,
+          "successful_clients": 4
+        },
+        {
+          "round": 4,
+          "mse": 110.2601261138916,
+          "mae": 7.316453695297241,
+          "comm_time_ms": 55.99629702393241,
+          "successful_clients": 4
+        },
+        {
+          "round": 5,
+          "mse": 105.30015563964844,
+          "mae": 7.2452229261398315,
+          "comm_time_ms": 56.116060943281724,
+          "successful_clients": 4
+        },
+        {
+          "round": 6,
+          "mse": 108.37758827209473,
+          "mae": 7.1843156814575195,
+          "comm_time_ms": 55.556959931419314,
+          "successful_clients": 4
+        },
+        {
+          "round": 7,
+          "mse": 103.9539852142334,
+          "mae": 7.2414093017578125,
+          "comm_time_ms": 55.07680987343964,
+          "successful_clients": 4
+        },
+        {
+          "round": 8,
+          "mse": 104.78550720214844,
+          "mae": 7.13215696811676,
+          "comm_time_ms": 55.91155507125935,
+          "successful_clients": 4
+        },
+        {
+          "round": 9,
+          "mse": 108.75593566894531,
+          "mae": 7.13808274269104,
+          "comm_time_ms": 54.63232404525066,
+          "successful_clients": 4
+        },
+        {
+          "round": 10,
+          "mse": 104.72798347473145,
+          "mae": 7.09619927406311,
+          "comm_time_ms": 56.383218239007796,
+          "successful_clients": 4
+        },
+        {
+          "round": 11,
+          "mse": 110.32822036743164,
+          "mae": 7.660024881362915,
+          "comm_time_ms": 53.151087248046984,
+          "successful_clients": 4
+        },
+        {
+          "round": 12,
+          "mse": 104.95757675170898,
+          "mae": 7.026500344276428,
+          "comm_time_ms": 55.38465350841469,
+          "successful_clients": 4
+        },
+        {
+          "round": 13,
+          "mse": 106.34488296508789,
+          "mae": 6.973388314247131,
+          "comm_time_ms": 55.19532327241287,
+          "successful_clients": 4
+        },
+        {
+          "round": 14,
+          "mse": 107.94022941589355,
+          "mae": 6.9908928871154785,
+          "comm_time_ms": 53.740096046922815,
+          "successful_clients": 4
+        },
+        {
+          "round": 15,
+          "mse": 105.71478271484375,
+          "mae": 6.998684883117676,
+          "comm_time_ms": 55.12026750433643,
+          "successful_clients": 4
+        }
+      ],
+      "final_mse": 105.71478271484375,
+      "final_mae": 6.998684883117676,
+      "total_comm_time_ms": 826.1552058443101,
+      "avg_comm_time_per_round_ms": 55.07701372295401,
+      "successful_updates": 60,
+      "failed_updates": 0,
+      "packet_loss_rate": 0.0,
+      "convergence_achieved": false
+    },
+    "normal": {
+      "scenario": "normal",
+      "network_config": {
+        "base_latency": 20,
+        "bandwidth": 50,
+        "packet_loss_probability": 0.01,
+        "jitter_range": 10
+      },
+      "round_metrics": [
+        {
+          "round": 1,
+          "mse": 108.03755950927734,
+          "mae": 7.4602707624435425,
+          "comm_time_ms": 228.3622643915523,
+          "successful_clients": 4
+        },
+        {
+          "round": 2,
+          "mse": 109.08132934570312,
+          "mae": 7.383609771728516,
+          "comm_time_ms": 213.22027945789546,
+          "successful_clients": 4
+        },
+        {
+          "round": 3,
+          "mse": 109.29801368713379,
+          "mae": 7.332527995109558,
+          "comm_time_ms": 203.22794571413712,
+          "successful_clients": 4
+        },
+        {
+          "round": 4,
+          "mse": 106.44515037536621,
+          "mae": 7.316861271858215,
+          "comm_time_ms": 218.319039505991,
+          "successful_clients": 4
+        },
+        {
+          "round": 5,
+          "mse": 106.76584434509277,
+          "mae": 7.278368234634399,
+          "comm_time_ms": 209.98923692196635,
+          "successful_clients": 4
+        },
+        {
+          "round": 6,
+          "mse": 106.32550811767578,
+          "mae": 7.1560750007629395,
+          "comm_time_ms": 210.76581005735773,
+          "successful_clients": 4
+        },
+        {
+          "round": 7,
+          "mse": 105.14612007141113,
+          "mae": 7.153267741203308,
+          "comm_time_ms": 194.74395140641442,
+          "successful_clients": 4
+        },
+        {
+          "round": 8,
+          "mse": 105.44469451904297,
+          "mae": 7.191181182861328,
+          "comm_time_ms": 224.27384742008505,
+          "successful_clients": 4
+        },
+        {
+          "round": 9,
+          "mse": 105.97117614746094,
+          "mae": 7.19574761390686,
+          "comm_time_ms": 227.27074134667475,
+          "successful_clients": 4
+        },
+        {
+          "round": 10,
+          "mse": 104.41804695129395,
+          "mae": 7.086301803588867,
+          "comm_time_ms": 214.9246911692564,
+          "successful_clients": 4
+        },
+        {
+          "round": 11,
+          "mse": 112.25252532958984,
+          "mae": 7.155163407325745,
+          "comm_time_ms": 210.34011843566708,
+          "successful_clients": 4
+        },
+        {
+          "round": 12,
+          "mse": 108.02279472351074,
+          "mae": 6.958045721054077,
+          "comm_time_ms": 214.84601338122388,
+          "successful_clients": 4
+        },
+        {
+          "round": 13,
+          "mse": 105.39104270935059,
+          "mae": 7.005783200263977,
+          "comm_time_ms": 223.25797198465256,
+          "successful_clients": 4
+        },
+        {
+          "round": 14,
+          "mse": 104.79554557800293,
+          "mae": 6.9121164083480835,
+          "comm_time_ms": 221.6389110176491,
+          "successful_clients": 4
+        },
+        {
+          "round": 15,
+          "mse": 113.1181755065918,
+          "mae": 7.048154234886169,
+          "comm_time_ms": 229.52746634005672,
+          "successful_clients": 4
+        }
+      ],
+      "final_mse": 113.1181755065918,
+      "final_mae": 7.048154234886169,
+      "total_comm_time_ms": 3244.70828855058,
+      "avg_comm_time_per_round_ms": 216.313885903372,
+      "successful_updates": 60,
+      "failed_updates": 0,
+      "packet_loss_rate": 0.0,
+      "convergence_achieved": false
+    },
+    "degraded": {
+      "scenario": "degraded",
+      "network_config": {
+        "base_latency": 50,
+        "bandwidth": 20,
+        "packet_loss_probability": 0.05,
+        "jitter_range": 25
+      },
+      "round_metrics": [
+        {
+          "round": 1,
+          "mse": 107.59862327575684,
+          "mae": 7.381863236427307,
+          "comm_time_ms": 506.1508324159431,
+          "successful_clients": 4
+        },
+        {
+          "round": 2,
+          "mse": 106.20468330383301,
+          "mae": 7.494263291358948,
+          "comm_time_ms": 538.0587241762946,
+          "successful_clients": 4
+        },
+        {
+          "round": 3,
+          "mse": 106.59188270568848,
+          "mae": 7.321918368339539,
+          "comm_time_ms": 557.0746445612465,
+          "successful_clients": 4
+        },
+        {
+          "round": 4,
+          "mse": 110.1163158416748,
+          "mae": 7.291101336479187,
+          "comm_time_ms": 565.1138620928073,
+          "successful_clients": 4
+        },
+        {
+          "round": 5,
+          "mse": 104.83133316040039,
+          "mae": 7.235254287719727,
+          "comm_time_ms": 512.5170159464931,
+          "successful_clients": 3
+        },
+        {
+          "round": 6,
+          "mse": 105.94015312194824,
+          "mae": 7.094931125640869,
+          "comm_time_ms": 518.2230899342579,
+          "successful_clients": 4
+        },
+        {
+          "round": 7,
+          "mse": 106.09106826782227,
+          "mae": 7.100547552108765,
+          "comm_time_ms": 517.7668445180585,
+          "successful_clients": 4
+        },
+        {
+          "round": 8,
+          "mse": 106.16275024414062,
+          "mae": 7.204752445220947,
+          "comm_time_ms": 558.6438954181959,
+          "successful_clients": 4
+        },
+        {
+          "round": 9,
+          "mse": 105.7954273223877,
+          "mae": 7.087494850158691,
+          "comm_time_ms": 540.5665171200941,
+          "successful_clients": 4
+        },
+        {
+          "round": 10,
+          "mse": 108.27626419067383,
+          "mae": 7.015032410621643,
+          "comm_time_ms": 507.79409523363177,
+          "successful_clients": 4
+        },
+        {
+          "round": 11,
+          "mse": 105.26166534423828,
+          "mae": 7.002735495567322,
+          "comm_time_ms": 537.767981963582,
+          "successful_clients": 4
+        },
+        {
+          "round": 12,
+          "mse": 106.48894309997559,
+          "mae": 6.945336818695068,
+          "comm_time_ms": 527.9877304320473,
+          "successful_clients": 4
+        },
+        {
+          "round": 13,
+          "mse": 105.4670524597168,
+          "mae": 7.000016689300537,
+          "comm_time_ms": 558.4795060306355,
+          "successful_clients": 4
+        },
+        {
+          "round": 14,
+          "mse": 105.43264770507812,
+          "mae": 6.903900384902954,
+          "comm_time_ms": 512.3597568288076,
+          "successful_clients": 4
+        },
+        {
+          "round": 15,
+          "mse": 106.41122436523438,
+          "mae": 6.914284944534302,
+          "comm_time_ms": 533.0676059443731,
+          "successful_clients": 4
+        }
+      ],
+      "final_mse": 106.41122436523438,
+      "final_mae": 6.914284944534302,
+      "total_comm_time_ms": 7991.572102616469,
+      "avg_comm_time_per_round_ms": 532.7714735077647,
+      "successful_updates": 59,
+      "failed_updates": 1,
+      "packet_loss_rate": 0.03333333333333333,
+      "convergence_achieved": false
+    },
+    "stressed": {
+      "scenario": "stressed",
+      "network_config": {
+        "base_latency": 100,
+        "bandwidth": 10,
+        "packet_loss_probability": 0.1,
+        "jitter_range": 50
+      },
+      "round_metrics": [
+        {
+          "round": 1,
+          "mse": 109.80048179626465,
+          "mae": 7.373170852661133,
+          "comm_time_ms": 1090.2634544601842,
+          "successful_clients": 4
+        },
+        {
+          "round": 2,
+          "mse": 113.78971099853516,
+          "mae": 7.5088289976119995,
+          "comm_time_ms": 1028.2435732249946,
+          "successful_clients": 4
+        },
+        {
+          "round": 3,
+          "mse": 105.93891906738281,
+          "mae": 7.444857597351074,
+          "comm_time_ms": 1098.6779550845197,
+          "successful_clients": 4
+        },
+        {
+          "round": 4,
+          "mse": 106.11688041687012,
+          "mae": 7.353613615036011,
+          "comm_time_ms": 1080.5643744650035,
+          "successful_clients": 4
+        },
+        {
+          "round": 5,
+          "mse": 108.27091407775879,
+          "mae": 7.306653141975403,
+          "comm_time_ms": 1055.8600472628611,
+          "successful_clients": 4
+        },
+        {
+          "round": 6,
+          "mse": 106.58656120300293,
+          "mae": 7.282518982887268,
+          "comm_time_ms": 1072.8614846363903,
+          "successful_clients": 4
+        },
+        {
+          "round": 7,
+          "mse": 105.82917022705078,
+          "mae": 7.261298298835754,
+          "comm_time_ms": 1036.5430107571494,
+          "successful_clients": 4
+        },
+        {
+          "round": 8,
+          "mse": 107.26086044311523,
+          "mae": 7.1925458908081055,
+          "comm_time_ms": 1108.668263893702,
+          "successful_clients": 4
+        },
+        {
+          "round": 9,
+          "mse": 106.23892211914062,
+          "mae": 7.200095295906067,
+          "comm_time_ms": 1050.3898650802334,
+          "successful_clients": 3
+        },
+        {
+          "round": 10,
+          "mse": 105.41932678222656,
+          "mae": 7.182188630104065,
+          "comm_time_ms": 1089.557842185031,
+          "successful_clients": 4
+        },
+        {
+          "round": 11,
+          "mse": 108.3199691772461,
+          "mae": 7.034217119216919,
+          "comm_time_ms": 1097.8623399116582,
+          "successful_clients": 4
+        },
+        {
+          "round": 12,
+          "mse": 106.6069164276123,
+          "mae": 7.002057194709778,
+          "comm_time_ms": 1068.7035176221884,
+          "successful_clients": 4
+        },
+        {
+          "round": 13,
+          "mse": 106.98685264587402,
+          "mae": 7.026242733001709,
+          "comm_time_ms": 1037.0081462256783,
+          "successful_clients": 3
+        },
+        {
+          "round": 14,
+          "mse": 108.39459800720215,
+          "mae": 7.031189918518066,
+          "comm_time_ms": 1120.368444883562,
+          "successful_clients": 4
+        },
+        {
+          "round": 15,
+          "mse": 106.17815971374512,
+          "mae": 7.081135392189026,
+          "comm_time_ms": 1054.5208569177994,
+          "successful_clients": 3
+        }
+      ],
+      "final_mse": 106.17815971374512,
+      "final_mae": 7.081135392189026,
+      "total_comm_time_ms": 16090.093176610957,
+      "avg_comm_time_per_round_ms": 1072.6728784407305,
+      "successful_updates": 57,
+      "failed_updates": 3,
+      "packet_loss_rate": 0.058333333333333334,
+      "convergence_achieved": false
+    },
+    "extreme": {
+      "scenario": "extreme",
+      "network_config": {
+        "base_latency": 200,
+        "bandwidth": 5,
+        "packet_loss_probability": 0.2,
+        "jitter_range": 100
+      },
+      "round_metrics": [
+        {
+          "round": 1,
+          "mse": 108.4459056854248,
+          "mae": 7.612520217895508,
+          "comm_time_ms": 2137.857031723122,
+          "successful_clients": 4
+        },
+        {
+          "round": 2,
+          "mse": 116.8319206237793,
+          "mae": 7.5721752643585205,
+          "comm_time_ms": 2056.6181075818995,
+          "successful_clients": 4
+        },
+        {
+          "round": 3,
+          "mse": 106.75012588500977,
+          "mae": 7.40684175491333,
+          "comm_time_ms": 2215.3397029060293,
+          "successful_clients": 4
+        },
+        {
+          "round": 4,
+          "mse": 107.19001007080078,
+          "mae": 7.484573125839233,
+          "comm_time_ms": 2238.2204953215187,
+          "successful_clients": 3
+        },
+        {
+          "round": 5,
+          "mse": 114.05852890014648,
+          "mae": 7.275344014167786,
+          "comm_time_ms": 2278.724737732016,
+          "successful_clients": 3
+        },
+        {
+          "round": 6,
+          "mse": 108.55924797058105,
+          "mae": 7.112434148788452,
+          "comm_time_ms": 2242.2350837114363,
+          "successful_clients": 3
+        },
+        {
+          "round": 7,
+          "mse": 105.26693344116211,
+          "mae": 7.072311162948608,
+          "comm_time_ms": 2054.7629541071874,
+          "successful_clients": 3
+        },
+        {
+          "round": 8,
+          "mse": 117.25497245788574,
+          "mae": 7.07461404800415,
+          "comm_time_ms": 2185.1144630415333,
+          "successful_clients": 2
+        },
+        {
+          "round": 9,
+          "mse": 111.40627479553223,
+          "mae": 6.893939137458801,
+          "comm_time_ms": 2270.3249712659617,
+          "successful_clients": 3
+        },
+        {
+          "round": 10,
+          "mse": 106.27231788635254,
+          "mae": 6.930782198905945,
+          "comm_time_ms": 2155.634197364161,
+          "successful_clients": 3
+        },
+        {
+          "round": 11,
+          "mse": 104.17954635620117,
+          "mae": 7.009409070014954,
+          "comm_time_ms": 2185.5382124580515,
+          "successful_clients": 3
+        },
+        {
+          "round": 12,
+          "mse": 105.3859748840332,
+          "mae": 6.854629158973694,
+          "comm_time_ms": 2123.6551824906232,
+          "successful_clients": 4
+        },
+        {
+          "round": 13,
+          "mse": 118.4177188873291,
+          "mae": 7.070924282073975,
+          "comm_time_ms": 2169.401888110336,
+          "successful_clients": 3
+        },
+        {
+          "round": 14,
+          "mse": 112.55363655090332,
+          "mae": 6.871947407722473,
+          "comm_time_ms": 2133.6926942842606,
+          "successful_clients": 3
+        },
+        {
+          "round": 15,
+          "mse": 104.88938903808594,
+          "mae": 6.859895944595337,
+          "comm_time_ms": 2240.8387072098794,
+          "successful_clients": 3
+        }
+      ],
+      "final_mse": 104.88938903808594,
+      "final_mae": 6.859895944595337,
+      "total_comm_time_ms": 32687.95842930801,
+      "avg_comm_time_per_round_ms": 2179.197228620534,
+      "successful_updates": 48,
+      "failed_updates": 12,
+      "packet_loss_rate": 0.2,
+      "convergence_achieved": false
+    }
+  },
+  "scalability": null,
+  "comparison": {
+    "methods": [
+      "Fixed-Time",
+      "Local-ML",
+      "Federated-Learning"
+    ],
+    "metrics": {
+      "avg_waiting_time": [
+        13.345536428658182,
+        9.715777449721681,
+        12.143165784938871
+      ],
+      "avg_queue_length": [
+        20.064583333333335,
+        14.640277777777778,
+        20.252777777777776
+      ],
+      "throughput_per_hour": [
+        20338.0,
+        20356.0,
+        20294.0
+      ],
+      "mse": [
+        0,
+        102.66053581237793,
+        109.22249031066895
+      ],
+      "mae": [
+        0,
+        7.273139119148254,
+        6.492492914199829
+      ]
+    },
+    "improvements": {
+      "Local-ML": {
+        "waiting_time_reduction": 27.198299583836604,
+        "queue_reduction": 27.034229744228718,
+        "throughput_increase": 0.08850427770675583,
+        "mae_reduction": -627.3139119148254
+      },
+      "Federated-Learning": {
+        "waiting_time_reduction": 9.009534012715608,
+        "queue_reduction": -0.9379434465095201,
+        "throughput_increase": -0.2163437899498476,
+        "mae_reduction": -549.2492914199829
+      }
+    }
+  }
+}

@@ -84,12 +84,22 @@ class ScalabilityExperiment:
 
         start_time = time.time()
 
-        # Create models
+        # Create models with optimized architecture
         local_models = {}
         for i in range(num_clients):
-            local_models[i] = create_model("neural_network", hidden_layers=[64, 32])
+            local_models[i] = create_model(
+                "neural_network",
+                hidden_layers=[128, 64, 32],
+                use_batch_norm=True,
+                dropout_rate=0.1
+            )
 
-        global_model = create_model("neural_network", hidden_layers=[64, 32])
+        global_model = create_model(
+            "neural_network",
+            hidden_layers=[128, 64, 32],
+            use_batch_norm=True,
+            dropout_rate=0.1
+        )
 
         round_metrics = []
         total_training_time = 0
@@ -104,7 +114,7 @@ class ScalabilityExperiment:
             for i in range(num_clients):
                 local_models[i].set_parameters(global_params)
 
-            # Local training
+            # Local training with optimized settings
             for client_id, (features, labels) in training_data.items():
                 if client_id >= num_clients:
                     continue
@@ -115,7 +125,9 @@ class ScalabilityExperiment:
                     (features, labels),
                     epochs=self.local_epochs,
                     batch_size=32,
-                    learning_rate=0.01
+                    learning_rate=0.001,  # Optimized learning rate
+                    weight_decay=1e-4,
+                    use_scheduler=True
                 )
 
                 local_models[client_id] = model

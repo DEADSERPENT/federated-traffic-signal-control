@@ -4,11 +4,11 @@ COMPREHENSIVE EXPERIMENT REPORT
 Federated Learning-based Adaptive Traffic Signal Control
 ================================================================================
 
-Experiment Date: 2026-01-16T18:38:48.316407
+Experiment Date: 2026-01-17T17:59:17.546027
 Random Seed: 42
 Intersections: 4
 Simulation Duration: 1800s
-FL Rounds: 30
+FL Rounds: 100
 
 ================================================================================
 PERFORMANCE COMPARISON TABLE
@@ -16,64 +16,64 @@ PERFORMANCE COMPARISON TABLE
 
 Metric            Fixed-Time        Local-ML          Federated-Learning
 ------------------------------------------------------------------------
-Avg Wait Time (s) 13.3455           9.7158            12.1432           
-Avg Queue Length  20.0646           14.6403           20.2528           
-Throughput/hr     20338.0000        20356.0000        20294.0000        
-MSE               0                 102.6605          109.2225          
-MAE               0                 7.2731            6.4925            
+Avg Wait Time (s) 13.3455           9.5479            9.4937            
+Avg Queue Length  20.0646           14.5521           14.5062           
+Throughput/hr     20338.0000        20884.0000        20882.0000        
+MSE               0                 18.7514           12.7136           
+MAE               0                 2.1753            1.8587            
 
 --------------------------------------------------------------------------------
 IMPROVEMENTS OVER BASELINE (Fixed-Time)
 --------------------------------------------------------------------------------
 
 Local-ML:
-  waiting_time_reduction: 27.20% (+)
-  queue_reduction: 27.03% (+)
-  throughput_increase: 0.09% (+)
-  mae_reduction: 627.31% (-)
+  waiting_time_reduction: 28.46% (+)
+  queue_reduction: 27.47% (+)
+  throughput_increase: 2.68% (+)
+  mae_reduction: 117.53% (-)
 
 Federated-Learning:
-  waiting_time_reduction: 9.01% (+)
-  queue_reduction: 0.94% (-)
-  throughput_increase: 0.22% (-)
-  mae_reduction: 549.25% (-)
+  waiting_time_reduction: 28.86% (+)
+  queue_reduction: 27.70% (+)
+  throughput_increase: 2.67% (+)
+  mae_reduction: 85.87% (-)
 ================================================================================
 
 
 --------------------------------------------------------------------------------
 FEDERATED LEARNING RESULTS
 --------------------------------------------------------------------------------
-  Final MSE: 109.2225
-  Final MAE: 6.4925
-  Total Rounds: 30
-  Convergence Rate: 10.89%
-  Rounds to 90% Improvement: 20
-  Final Stability: 0.0530
+  Final MSE: 12.7136
+  Final MAE: 1.8587
+  Total Rounds: 100
+  Convergence Rate: 41.99%
+  Rounds to 90% Improvement: 3
+  Final Stability: 0.0078
 
 --------------------------------------------------------------------------------
 IMPROVEMENTS OVER BASELINE
 --------------------------------------------------------------------------------
 
   Local-ML:
-    waiting_time_reduction: 27.20% (+)
-    queue_reduction: 27.03% (+)
-    throughput_increase: 0.09% (+)
-    mae_reduction: 627.31% (-)
+    waiting_time_reduction: 28.46% (+)
+    queue_reduction: 27.47% (+)
+    throughput_increase: 2.68% (+)
+    mae_reduction: 117.53% (-)
 
   Federated-Learning:
-    waiting_time_reduction: 9.01% (+)
-    queue_reduction: 0.94% (-)
-    throughput_increase: 0.22% (-)
-    mae_reduction: 549.25% (-)
+    waiting_time_reduction: 28.86% (+)
+    queue_reduction: 27.70% (+)
+    throughput_increase: 2.67% (+)
+    mae_reduction: 85.87% (-)
 
 --------------------------------------------------------------------------------
 NETWORK STRESS RESILIENCE
 --------------------------------------------------------------------------------
-  ideal: MAE=6.9987 [X]
-  normal: MAE=7.0482 [X]
-  degraded: MAE=6.9143 [X]
-  stressed: MAE=7.0811 [X]
-  extreme: MAE=6.8599 [X]
+  ideal: MAE=2.3018 [OK]
+  normal: MAE=2.3242 [OK]
+  degraded: MAE=2.3142 [OK]
+  stressed: MAE=2.3211 [OK]
+  extreme: MAE=2.2938 [OK]
 
 ================================================================================
 KEY CONCLUSIONS

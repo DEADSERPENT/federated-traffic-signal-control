@@ -20,12 +20,15 @@ traffic:
   max_green_duration: 90  # seconds
   yellow_duration: 3  # seconds
 
-# Federated Learning Settings
+# Federated Learning Settings (Optimized for Superior Performance)
 federated_learning:
-  num_rounds: 50
-  local_epochs: 5
+  num_rounds: 100  # Increased for better convergence
+  local_epochs: 10  # More local training per round
   batch_size: 32
-  learning_rate: 0.01
+  learning_rate: 0.001  # Lower LR for stability
+  lr_decay: 0.995  # Learning rate decay per round
+  weight_decay: 0.0001  # L2 regularization
+  min_lr: 0.0001  # Minimum learning rate
 
   # Server settings
   server_address: "localhost:8080"
@@ -33,12 +36,17 @@ federated_learning:
   fraction_fit: 1.0
   fraction_evaluate: 1.0
 
-# Model Settings
+  # Early stopping
+  patience: 15  # Rounds without improvement before stopping
+
+# Model Settings (Enhanced Architecture)
 model:
   type: "neural_network"  # "linear_regression" or "neural_network"
-  hidden_layers: [64, 32]
-  activation: "relu"
+  hidden_layers: [128, 64, 32]  # Deeper network
+  activation: "leaky_relu"  # Better gradient flow
   output_activation: "linear"
+  use_batch_norm: true  # Batch normalization
+  dropout_rate: 0.1  # Progressive dropout
 
 # Network Simulation Settings
 network:

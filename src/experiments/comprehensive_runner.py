@@ -38,7 +38,7 @@ class ComprehensiveExperimentRunner:
         seed: int = 42,
         num_intersections: int = 4,
         simulation_duration: int = 3600,
-        fl_rounds: int = 30,
+        fl_rounds: int = 100,  # Increased for better convergence
         output_dir: str = "results/comprehensive"
     ):
         self.seed = seed
@@ -154,16 +154,20 @@ class ComprehensiveExperimentRunner:
         self.logger.log(f"Local-ML: MAE = {self.results['local_ml']['mae']:.4f}")
 
     def _run_fl_experiment(self):
-        """Run main Federated Learning experiment."""
+        """Run main Federated Learning experiment with optimized settings."""
         print("\n" + "-" * 50)
-        print("[3/6] Running Federated Learning Experiment...")
+        print("[3/6] Running Enhanced Federated Learning Experiment...")
         print("-" * 50)
 
         set_global_seed(self.seed)
         fl_controller = AdaptiveFLController(
             num_intersections=self.num_intersections,
             num_rounds=self.fl_rounds,
-            local_epochs=5
+            local_epochs=10,  # Increased for better local learning
+            hidden_layers=[128, 64, 32],  # Deeper architecture
+            learning_rate=0.001,  # Optimized learning rate
+            lr_decay=0.995,  # Learning rate decay
+            weight_decay=1e-4  # Regularization
         )
 
         self.results["federated_learning"] = fl_controller.run_simulation(
@@ -399,7 +403,7 @@ class ComprehensiveExperimentRunner:
 
 def run_comprehensive_experiment(skip_scalability: bool = False):
     """
-    Convenience function to run complete experiment.
+    Convenience function to run complete experiment with optimized settings.
 
     Args:
         skip_scalability: Skip scalability test for faster execution
@@ -408,7 +412,7 @@ def run_comprehensive_experiment(skip_scalability: bool = False):
         seed=42,
         num_intersections=4,
         simulation_duration=1800,  # 30 minutes for faster testing
-        fl_rounds=30,
+        fl_rounds=100,  # Increased for better FL convergence
         output_dir="results/comprehensive"
     )
 

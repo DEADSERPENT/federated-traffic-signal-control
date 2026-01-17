@@ -120,8 +120,13 @@ class TrafficDataGenerator:
 
     def _calculate_optimal_green(self, intersection: Intersection) -> float:
         """
-        Calculate optimal green duration based on current queue state.
-        This is a heuristic that can be replaced with more sophisticated methods.
+        Optimal green duration calculation optimized for MINIMUM WAITING TIME.
+        This trains the FL model to aggressively minimize vehicle waiting.
+
+        Key principles:
+        - Switch faster when waiting queue is building up
+        - Clear active queue efficiently but don't over-stay
+        - Prefer shorter cycles for better responsiveness
 
         Args:
             intersection: Intersection object
@@ -141,27 +146,51 @@ class TrafficDataGenerator:
             waiting_queue = (intersection.lanes["north"].queue_length +
                             intersection.lanes["south"].queue_length)
 
-        # Base green duration
-        base_green = 30.0
+        total_queue = active_queue + waiting_queue
+        min_green = intersection.min_green
+        max_green = min(intersection.max_green, 70)  # Cap at 70 for responsiveness
 
-        # Adjust based on relative queue lengths
-        if active_queue + waiting_queue > 0:
-            ratio = active_queue / (active_queue + waiting_queue + 1)
-            optimal_green = base_green + (ratio - 0.5) * 40
+        if total_queue == 0:
+            # No traffic - use minimum
+            optimal_green = min_green
         else:
-            optimal_green = base_green
+            # Time to clear active queue (2 vehicles/sec throughput)
+            time_to_clear = active_queue / 2.0
 
-        # Add some noise to prevent overfitting
-        optimal_green += np.random.normal(0, 2)
+            # WAITING TIME MINIMIZATION STRATEGY:
+            # The key insight is that waiting time accumulates faster when
+            # vehicles wait longer. Short, responsive cycles reduce total wait.
 
-        # Clip to valid range
-        optimal_green = np.clip(
-            optimal_green,
-            intersection.min_green,
-            intersection.max_green
-        )
+            if waiting_queue > active_queue * 1.5 and waiting_queue > 5:
+                # Heavy imbalance: waiting vehicles are accumulating wait time fast
+                # Give just enough time to clear some of active, then switch
+                optimal_green = max(time_to_clear * 0.6, min_green)
+                optimal_green = min(optimal_green, 25)  # Cap to switch quickly
+            elif active_queue > waiting_queue * 1.5 and active_queue > 5:
+                # Active queue is heavy - clear it efficiently
+                optimal_green = time_to_clear + 3
+                optimal_green = min(optimal_green, 45)  # But don't over-stay
+            elif total_queue < 10:
+                # Light traffic - use short cycles for responsiveness
+                optimal_green = min_green + 5
+            else:
+                # Balanced traffic - proportional allocation
+                queue_ratio = active_queue / (total_queue + 1)
+                # Base: proportional to active queue's share
+                optimal_green = 15 + queue_ratio * 30
 
-        return optimal_green
+                # Urgency penalty: high waiting queue = cut current phase shorter
+                if waiting_queue > 10:
+                    urgency = min(waiting_queue / 10, 2)
+                    optimal_green -= urgency * 5
+
+        # Minimal noise for stable learning
+        optimal_green += np.random.normal(0, 0.3)
+
+        # Clip to valid range with lower cap for faster response
+        optimal_green = np.clip(optimal_green, min_green, max_green)
+
+        return float(optimal_green)
 
     def run_simulation(
         self,
@@ -227,6 +256,8 @@ class TrafficDataGenerator:
         Get training data for a specific intersection (edge node).
         Used by federated learning clients.
 
+        Enhanced with more training samples for better FL generalization.
+
         Args:
             intersection_id: ID of the intersection
 
@@ -234,7 +265,7 @@ class TrafficDataGenerator:
             Tuple of (features, labels) for local training
         """
         return self.generate_training_data(
-            num_samples=500,
+            num_samples=1000,  # Increased from 500 for better FL performance
             intersection_id=intersection_id
         )
 

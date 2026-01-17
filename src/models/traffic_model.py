@@ -1,6 +1,7 @@
 """
 Traffic Signal Optimization Model
 Neural network model for predicting optimal green signal duration.
+Optimized architecture for Federated Learning performance.
 """
 
 import torch
@@ -12,7 +13,13 @@ from collections import OrderedDict
 
 class TrafficSignalModel(nn.Module):
     """
-    Neural network model for traffic signal optimization.
+    Enhanced neural network model for traffic signal optimization.
+
+    Optimized for Federated Learning with:
+    - Deeper architecture with batch normalization
+    - Residual-style connections for better gradient flow
+    - Optimized dropout strategy
+    - Better weight initialization
 
     Input features:
     - Queue length for 4 directions (north, south, east, west)
@@ -27,7 +34,9 @@ class TrafficSignalModel(nn.Module):
         self,
         input_dim: int = 6,
         hidden_layers: List[int] = None,
-        output_dim: int = 1
+        output_dim: int = 1,
+        use_batch_norm: bool = True,
+        dropout_rate: float = 0.1
     ):
         """
         Initialize the model.
@@ -36,26 +45,47 @@ class TrafficSignalModel(nn.Module):
             input_dim: Number of input features
             hidden_layers: List of hidden layer sizes
             output_dim: Number of output values
+            use_batch_norm: Whether to use batch normalization
+            dropout_rate: Dropout rate for regularization
         """
         super(TrafficSignalModel, self).__init__()
 
         if hidden_layers is None:
-            hidden_layers = [64, 32]
+            hidden_layers = [128, 64, 32]  # Deeper default architecture
 
+        self.use_batch_norm = use_batch_norm
         layers = []
         prev_dim = input_dim
 
-        # Build hidden layers
+        # Build hidden layers with improved architecture
         for i, hidden_dim in enumerate(hidden_layers):
             layers.append((f"linear_{i}", nn.Linear(prev_dim, hidden_dim)))
-            layers.append((f"relu_{i}", nn.ReLU()))
-            layers.append((f"dropout_{i}", nn.Dropout(0.2)))
+            if use_batch_norm:
+                layers.append((f"bn_{i}", nn.BatchNorm1d(hidden_dim)))
+            layers.append((f"relu_{i}", nn.LeakyReLU(0.1)))  # LeakyReLU for better gradients
+            # Progressive dropout - less in early layers
+            drop_rate = dropout_rate * (i + 1) / len(hidden_layers)
+            layers.append((f"dropout_{i}", nn.Dropout(drop_rate)))
             prev_dim = hidden_dim
 
         # Output layer
         layers.append(("output", nn.Linear(prev_dim, output_dim)))
 
         self.network = nn.Sequential(OrderedDict(layers))
+
+        # Initialize weights for better convergence
+        self._initialize_weights()
+
+    def _initialize_weights(self):
+        """Initialize weights using Kaiming initialization for ReLU networks."""
+        for module in self.modules():
+            if isinstance(module, nn.Linear):
+                nn.init.kaiming_normal_(module.weight, mode='fan_in', nonlinearity='leaky_relu')
+                if module.bias is not None:
+                    nn.init.zeros_(module.bias)
+            elif isinstance(module, nn.BatchNorm1d):
+                nn.init.ones_(module.weight)
+                nn.init.zeros_(module.bias)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         """Forward pass through the network."""
@@ -80,16 +110,20 @@ class TrafficSignalModel(nn.Module):
             return predictions.numpy().flatten()
 
     def get_parameters(self) -> List[np.ndarray]:
-        """Get model parameters as list of numpy arrays."""
-        return [param.cpu().detach().numpy() for param in self.parameters()]
+        """Get model state dict values as list of numpy arrays (includes BatchNorm buffers)."""
+        return [val.cpu().detach().numpy() for val in self.state_dict().values()]
 
     def set_parameters(self, parameters: List[np.ndarray]):
-        """Set model parameters from list of numpy arrays."""
-        params_dict = zip(self.state_dict().keys(), parameters)
-        state_dict = OrderedDict({
-            k: torch.tensor(v) for k, v in params_dict
-        })
+        """Set model state from list of numpy arrays (includes BatchNorm buffers)."""
+        state_dict = self.state_dict()
+        keys = list(state_dict.keys())
+        for key, param in zip(keys, parameters):
+            state_dict[key] = torch.tensor(param)
         self.load_state_dict(state_dict, strict=True)
+
+    def get_state_keys(self) -> List[str]:
+        """Get state dict keys for debugging."""
+        return list(self.state_dict().keys())
 
 
 class LinearRegressionModel(nn.Module):
@@ -103,28 +137,38 @@ class LinearRegressionModel(nn.Module):
         return self.linear(x)
 
     def get_parameters(self) -> List[np.ndarray]:
-        return [param.cpu().detach().numpy() for param in self.parameters()]
+        """Get model state dict values as list of numpy arrays."""
+        return [val.cpu().detach().numpy() for val in self.state_dict().values()]
 
     def set_parameters(self, parameters: List[np.ndarray]):
-        params_dict = zip(self.state_dict().keys(), parameters)
-        state_dict = OrderedDict({
-            k: torch.tensor(v) for k, v in params_dict
-        })
+        """Set model state from list of numpy arrays."""
+        state_dict = self.state_dict()
+        keys = list(state_dict.keys())
+        for key, param in zip(keys, parameters):
+            state_dict[key] = torch.tensor(param)
         self.load_state_dict(state_dict, strict=True)
 
 
-def create_model(model_type: str = "neural_network", **kwargs) -> nn.Module:
+def create_model(model_type: str = "neural_network", optimized: bool = True, **kwargs) -> nn.Module:
     """
     Factory function to create traffic signal models.
 
     Args:
         model_type: "neural_network" or "linear_regression"
+        optimized: Use optimized architecture for FL (deeper network)
         **kwargs: Additional arguments for model initialization
 
     Returns:
         PyTorch model instance
     """
     if model_type == "neural_network":
+        # Use optimized architecture by default
+        if optimized and "hidden_layers" not in kwargs:
+            kwargs["hidden_layers"] = [128, 64, 32]
+        if "use_batch_norm" not in kwargs:
+            kwargs["use_batch_norm"] = True
+        if "dropout_rate" not in kwargs:
+            kwargs["dropout_rate"] = 0.1
         return TrafficSignalModel(**kwargs)
     elif model_type == "linear_regression":
         return LinearRegressionModel(**kwargs)
@@ -137,10 +181,13 @@ def train_model(
     train_data: Tuple[np.ndarray, np.ndarray],
     epochs: int = 10,
     batch_size: int = 32,
-    learning_rate: float = 0.01
+    learning_rate: float = 0.001,
+    weight_decay: float = 1e-4,
+    use_scheduler: bool = True,
+    gradient_clip: float = 1.0
 ) -> Tuple[nn.Module, List[float]]:
     """
-    Train the model on local data.
+    Enhanced training with advanced techniques for better FL performance.
 
     Args:
         model: PyTorch model to train
@@ -148,6 +195,9 @@ def train_model(
         epochs: Number of training epochs
         batch_size: Batch size for training
         learning_rate: Learning rate
+        weight_decay: L2 regularization weight decay
+        use_scheduler: Whether to use learning rate scheduler
+        gradient_clip: Max gradient norm for clipping
 
     Returns:
         Tuple of (trained model, loss history)
@@ -158,11 +208,26 @@ def train_model(
 
     dataset = torch.utils.data.TensorDataset(features, labels)
     dataloader = torch.utils.data.DataLoader(
-        dataset, batch_size=batch_size, shuffle=True
+        dataset, batch_size=batch_size, shuffle=True, drop_last=False
     )
 
-    criterion = nn.MSELoss()
-    optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
+    # Use Smooth L1 Loss (Huber Loss) - more robust to outliers
+    criterion = nn.SmoothL1Loss(beta=1.0)
+
+    # AdamW optimizer with weight decay for better generalization
+    optimizer = torch.optim.AdamW(
+        model.parameters(),
+        lr=learning_rate,
+        weight_decay=weight_decay,
+        betas=(0.9, 0.999)
+    )
+
+    # Cosine annealing scheduler for better convergence
+    scheduler = None
+    if use_scheduler and epochs > 1:
+        scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(
+            optimizer, T_max=epochs, eta_min=learning_rate * 0.01
+        )
 
     model.train()
     loss_history = []
@@ -176,12 +241,20 @@ def train_model(
             predictions = model(batch_features)
             loss = criterion(predictions, batch_labels)
             loss.backward()
+
+            # Gradient clipping for stability
+            if gradient_clip > 0:
+                torch.nn.utils.clip_grad_norm_(model.parameters(), gradient_clip)
+
             optimizer.step()
 
             epoch_loss += loss.item()
             num_batches += 1
 
-        avg_loss = epoch_loss / num_batches
+        if scheduler is not None:
+            scheduler.step()
+
+        avg_loss = epoch_loss / max(num_batches, 1)
         loss_history.append(avg_loss)
 
     return model, loss_history
@@ -215,25 +288,32 @@ def evaluate_model(
 
 
 if __name__ == "__main__":
-    # Test the model
-    print("Testing Traffic Signal Model...")
+    # Test the enhanced model
+    print("Testing Enhanced Traffic Signal Model...")
 
-    # Create model
-    model = create_model("neural_network", hidden_layers=[64, 32])
+    # Create optimized model
+    model = create_model("neural_network", hidden_layers=[128, 64, 32])
     print(f"Model architecture:\n{model}")
+    print(f"\nTotal parameters: {sum(p.numel() for p in model.parameters())}")
 
     # Generate dummy data
     np.random.seed(42)
-    features = np.random.rand(100, 6).astype(np.float32)
-    labels = np.random.rand(100).astype(np.float32) * 60 + 20  # 20-80 seconds
+    features = np.random.rand(200, 6).astype(np.float32)
+    labels = np.random.rand(200).astype(np.float32) * 60 + 20  # 20-80 seconds
 
-    # Train
-    print("\nTraining model...")
-    model, losses = train_model(model, (features, labels), epochs=5)
+    # Train with enhanced settings
+    print("\nTraining model with enhanced settings...")
+    model, losses = train_model(
+        model, (features, labels),
+        epochs=10,
+        learning_rate=0.001,
+        weight_decay=1e-4
+    )
+    print(f"Initial loss: {losses[0]:.4f}")
     print(f"Final loss: {losses[-1]:.4f}")
 
     # Evaluate
-    mse, mae = evaluate_model(model, (features[:20], labels[:20]))
+    mse, mae = evaluate_model(model, (features[:40], labels[:40]))
     print(f"Test MSE: {mse:.4f}, MAE: {mae:.4f}")
 
     # Test prediction

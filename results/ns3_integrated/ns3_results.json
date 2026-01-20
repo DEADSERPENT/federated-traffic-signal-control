@@ -1,0 +1,372 @@
+{
+  "metadata": {
+    "timestamp": "2026-01-20T15:59:58.591809",
+    "ns3_enabled": false,
+    "network_scenario": "normal",
+    "num_rounds": 50
+  },
+  "fixed_time": {
+    "avg_waiting_time": 13.345536428658182,
+    "avg_queue_length": 20.064583333333335
+  },
+  "local_ml": {
+    "avg_waiting_time": 9.547868663111796,
+    "mae": 2.1753498017787933
+  },
+  "federated_learning": {
+    "avg_waiting_time": 9.231558117369238,
+    "mae": 2.1875291913747787,
+    "network_metrics": [
+      {
+        "round": 1,
+        "broadcast_latency_ms": 10.0,
+        "upload_latency_ms": 10.0,
+        "total_latency_ms": 20.0,
+        "successful_clients": 4
+      },
+      {
+        "round": 2,
+        "broadcast_latency_ms": 10.0,
+        "upload_latency_ms": 10.0,
+        "total_latency_ms": 20.0,
+        "successful_clients": 4
+      },
+      {
+        "round": 3,
+        "broadcast_latency_ms": 10.0,
+        "upload_latency_ms": 10.0,
+        "total_latency_ms": 20.0,
+        "successful_clients": 4
+      },
+      {
+        "round": 4,
+        "broadcast_latency_ms": 10.0,
+        "upload_latency_ms": 10.0,
+        "total_latency_ms": 20.0,
+        "successful_clients": 4
+      },
+      {
+        "round": 5,
+        "broadcast_latency_ms": 10.0,
+        "upload_latency_ms": 10.0,
+        "total_latency_ms": 20.0,
+        "successful_clients": 4
+      },
+      {
+        "round": 6,
+        "broadcast_latency_ms": 10.0,
+        "upload_latency_ms": 10.0,
+        "total_latency_ms": 20.0,
+        "successful_clients": 4
+      },
+      {
+        "round": 7,
+        "broadcast_latency_ms": 10.0,
+        "upload_latency_ms": 10.0,
+        "total_latency_ms": 20.0,
+        "successful_clients": 4
+      },
+      {
+        "round": 8,
+        "broadcast_latency_ms": 10.0,
+        "upload_latency_ms": 10.0,
+        "total_latency_ms": 20.0,
+        "successful_clients": 4
+      },
+      {
+        "round": 9,
+        "broadcast_latency_ms": 10.0,
+        "upload_latency_ms": 10.0,
+        "total_latency_ms": 20.0,
+        "successful_clients": 4
+      },
+      {
+        "round": 10,
+        "broadcast_latency_ms": 10.0,
+        "upload_latency_ms": 10.0,
+        "total_latency_ms": 20.0,
+        "successful_clients": 4
+      },
+      {
+        "round": 11,
+        "broadcast_latency_ms": 10.0,
+        "upload_latency_ms": 10.0,
+        "total_latency_ms": 20.0,
+        "successful_clients": 4
+      },
+      {
+        "round": 12,
+        "broadcast_latency_ms": 10.0,
+        "upload_latency_ms": 10.0,
+        "total_latency_ms": 20.0,
+        "successful_clients": 4
+      },
+      {
+        "round": 13,
+        "broadcast_latency_ms": 10.0,
+        "upload_latency_ms": 10.0,
+        "total_latency_ms": 20.0,
+        "successful_clients": 4
+      },
+      {
+        "round": 14,
+        "broadcast_latency_ms": 10.0,
+        "upload_latency_ms": 10.0,
+        "total_latency_ms": 20.0,
+        "successful_clients": 4
+      },
+      {
+        "round": 15,
+        "broadcast_latency_ms": 10.0,
+        "upload_latency_ms": 10.0,
+        "total_latency_ms": 20.0,
+        "successful_clients": 4
+      },
+      {
+        "round": 16,
+        "broadcast_latency_ms": 10.0,
+        "upload_latency_ms": 10.0,
+        "total_latency_ms": 20.0,
+        "successful_clients": 4
+      },
+      {
+        "round": 17,
+        "broadcast_latency_ms": 10.0,
+        "upload_latency_ms": 10.0,
+        "total_latency_ms": 20.0,
+        "successful_clients": 4
+      },
+      {
+        "round": 18,
+        "broadcast_latency_ms": 10.0,
+        "upload_latency_ms": 10.0,
+        "total_latency_ms": 20.0,
+        "successful_clients": 4
+      },
+      {
+        "round": 19,
+        "broadcast_latency_ms": 10.0,
+        "upload_latency_ms": 10.0,
+        "total_latency_ms": 20.0,
+        "successful_clients": 4
+      },
+      {
+        "round": 20,
+        "broadcast_latency_ms": 10.0,
+        "upload_latency_ms": 10.0,
+        "total_latency_ms": 20.0,
+        "successful_clients": 4
+      },
+      {
+        "round": 21,
+        "broadcast_latency_ms": 10.0,
+        "upload_latency_ms": 10.0,
+        "total_latency_ms": 20.0,
+        "successful_clients": 4
+      },
+      {
+        "round": 22,
+        "broadcast_latency_ms": 10.0,
+        "upload_latency_ms": 10.0,
+        "total_latency_ms": 20.0,
+        "successful_clients": 4
+      },
+      {
+        "round": 23,
+        "broadcast_latency_ms": 10.0,
+        "upload_latency_ms": 10.0,
+        "total_latency_ms": 20.0,
+        "successful_clients": 4
+      },
+      {
+        "round": 24,
+        "broadcast_latency_ms": 10.0,
+        "upload_latency_ms": 10.0,
+        "total_latency_ms": 20.0,
+        "successful_clients": 4
+      },
+      {
+        "round": 25,
+        "broadcast_latency_ms": 10.0,
+        "upload_latency_ms": 10.0,
+        "total_latency_ms": 20.0,
+        "successful_clients": 4
+      },
+      {
+        "round": 26,
+        "broadcast_latency_ms": 10.0,
+        "upload_latency_ms": 10.0,
+        "total_latency_ms": 20.0,
+        "successful_clients": 4
+      },
+      {
+        "round": 27,
+        "broadcast_latency_ms": 10.0,
+        "upload_latency_ms": 10.0,
+        "total_latency_ms": 20.0,
+        "successful_clients": 4
+      },
+      {
+        "round": 28,
+        "broadcast_latency_ms": 10.0,
+        "upload_latency_ms": 10.0,
+        "total_latency_ms": 20.0,
+        "successful_clients": 4
+      },
+      {
+        "round": 29,
+        "broadcast_latency_ms": 10.0,
+        "upload_latency_ms": 10.0,
+        "total_latency_ms": 20.0,
+        "successful_clients": 4
+      },
+      {
+        "round": 30,
+        "broadcast_latency_ms": 10.0,
+        "upload_latency_ms": 10.0,
+        "total_latency_ms": 20.0,
+        "successful_clients": 4
+      },
+      {
+        "round": 31,
+        "broadcast_latency_ms": 10.0,
+        "upload_latency_ms": 10.0,
+        "total_latency_ms": 20.0,
+        "successful_clients": 4
+      },
+      {
+        "round": 32,
+        "broadcast_latency_ms": 10.0,
+        "upload_latency_ms": 10.0,
+        "total_latency_ms": 20.0,
+        "successful_clients": 4
+      },
+      {
+        "round": 33,
+        "broadcast_latency_ms": 10.0,
+        "upload_latency_ms": 10.0,
+        "total_latency_ms": 20.0,
+        "successful_clients": 4
+      },
+      {
+        "round": 34,
+        "broadcast_latency_ms": 10.0,
+        "upload_latency_ms": 10.0,
+        "total_latency_ms": 20.0,
+        "successful_clients": 4
+      },
+      {
+        "round": 35,
+        "broadcast_latency_ms": 10.0,
+        "upload_latency_ms": 10.0,
+        "total_latency_ms": 20.0,
+        "successful_clients": 4
+      },
+      {
+        "round": 36,
+        "broadcast_latency_ms": 10.0,
+        "upload_latency_ms": 10.0,
+        "total_latency_ms": 20.0,
+        "successful_clients": 4
+      },
+      {
+        "round": 37,
+        "broadcast_latency_ms": 10.0,
+        "upload_latency_ms": 10.0,
+        "total_latency_ms": 20.0,
+        "successful_clients": 4
+      },
+      {
+        "round": 38,
+        "broadcast_latency_ms": 10.0,
+        "upload_latency_ms": 10.0,
+        "total_latency_ms": 20.0,
+        "successful_clients": 4
+      },
+      {
+        "round": 39,
+        "broadcast_latency_ms": 10.0,
+        "upload_latency_ms": 10.0,
+        "total_latency_ms": 20.0,
+        "successful_clients": 4
+      },
+      {
+        "round": 40,
+        "broadcast_latency_ms": 10.0,
+        "upload_latency_ms": 10.0,
+        "total_latency_ms": 20.0,
+        "successful_clients": 4
+      },
+      {
+        "round": 41,
+        "broadcast_latency_ms": 10.0,
+        "upload_latency_ms": 10.0,
+        "total_latency_ms": 20.0,
+        "successful_clients": 4
+      },
+      {
+        "round": 42,
+        "broadcast_latency_ms": 10.0,
+        "upload_latency_ms": 10.0,
+        "total_latency_ms": 20.0,
+        "successful_clients": 4
+      },
+      {
+        "round": 43,
+        "broadcast_latency_ms": 10.0,
+        "upload_latency_ms": 10.0,
+        "total_latency_ms": 20.0,
+        "successful_clients": 4
+      },
+      {
+        "round": 44,
+        "broadcast_latency_ms": 10.0,
+        "upload_latency_ms": 10.0,
+        "total_latency_ms": 20.0,
+        "successful_clients": 4
+      },
+      {
+        "round": 45,
+        "broadcast_latency_ms": 10.0,
+        "upload_latency_ms": 10.0,
+        "total_latency_ms": 20.0,
+        "successful_clients": 4
+      },
+      {
+        "round": 46,
+        "broadcast_latency_ms": 10.0,
+        "upload_latency_ms": 10.0,
+        "total_latency_ms": 20.0,
+        "successful_clients": 4
+      },
+      {
+        "round": 47,
+        "broadcast_latency_ms": 10.0,
+        "upload_latency_ms": 10.0,
+        "total_latency_ms": 20.0,
+        "successful_clients": 4
+      },
+      {
+        "round": 48,
+        "broadcast_latency_ms": 10.0,
+        "upload_latency_ms": 10.0,
+        "total_latency_ms": 20.0,
+        "successful_clients": 4
+      },
+      {
+        "round": 49,
+        "broadcast_latency_ms": 10.0,
+        "upload_latency_ms": 10.0,
+        "total_latency_ms": 20.0,
+        "successful_clients": 4
+      },
+      {
+        "round": 50,
+        "broadcast_latency_ms": 10.0,
+        "upload_latency_ms": 10.0,
+        "total_latency_ms": 20.0,
+        "successful_clients": 4
+      }
+    ]
+  }
+}

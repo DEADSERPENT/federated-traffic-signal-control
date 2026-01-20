@@ -4,7 +4,7 @@ COMPREHENSIVE EXPERIMENT REPORT
 Federated Learning-based Adaptive Traffic Signal Control
 ================================================================================
 
-Experiment Date: 2026-01-17T17:59:17.546027
+Experiment Date: 2026-01-18T08:40:56.515543
 Random Seed: 42
 Intersections: 4
 Simulation Duration: 1800s
@@ -16,64 +16,64 @@ PERFORMANCE COMPARISON TABLE
 
 Metric            Fixed-Time        Local-ML          Federated-Learning
 ------------------------------------------------------------------------
-Avg Wait Time (s) 13.3455           9.5479            9.4937            
-Avg Queue Length  20.0646           14.5521           14.5062           
-Throughput/hr     20338.0000        20884.0000        20882.0000        
-MSE               0                 18.7514           12.7136           
-MAE               0                 2.1753            1.8587            
+Avg Wait Time (s) 13.3455           9.5439            9.5143            
+Avg Queue Length  20.0646           14.5861           14.5660           
+Throughput/hr     20338.0000        20894.0000        20858.0000        
+MSE               0                 18.7110           12.8111           
+MAE               0                 2.1757            1.8756            
 
 --------------------------------------------------------------------------------
 IMPROVEMENTS OVER BASELINE (Fixed-Time)
 --------------------------------------------------------------------------------
 
 Local-ML:
-  waiting_time_reduction: 28.46% (+)
-  queue_reduction: 27.47% (+)
-  throughput_increase: 2.68% (+)
-  mae_reduction: 117.53% (-)
+  waiting_time_reduction: 28.49% (+)
+  queue_reduction: 27.30% (+)
+  throughput_increase: 2.73% (+)
+  mae_reduction: 117.57% (-)
 
 Federated-Learning:
-  waiting_time_reduction: 28.86% (+)
-  queue_reduction: 27.70% (+)
-  throughput_increase: 2.67% (+)
-  mae_reduction: 85.87% (-)
+  waiting_time_reduction: 28.71% (+)
+  queue_reduction: 27.40% (+)
+  throughput_increase: 2.56% (+)
+  mae_reduction: 87.56% (-)
 ================================================================================
 
 
 --------------------------------------------------------------------------------
 FEDERATED LEARNING RESULTS
 --------------------------------------------------------------------------------
-  Final MSE: 12.7136
-  Final MAE: 1.8587
+  Final MSE: 12.8111
+  Final MAE: 1.8756
   Total Rounds: 100
-  Convergence Rate: 41.99%
+  Convergence Rate: 41.95%
   Rounds to 90% Improvement: 3
-  Final Stability: 0.0078
+  Final Stability: 0.0063
 
 --------------------------------------------------------------------------------
 IMPROVEMENTS OVER BASELINE
 --------------------------------------------------------------------------------
 
   Local-ML:
-    waiting_time_reduction: 28.46% (+)
-    queue_reduction: 27.47% (+)
-    throughput_increase: 2.68% (+)
-    mae_reduction: 117.53% (-)
+    waiting_time_reduction: 28.49% (+)
+    queue_reduction: 27.30% (+)
+    throughput_increase: 2.73% (+)
+    mae_reduction: 117.57% (-)
 
   Federated-Learning:
-    waiting_time_reduction: 28.86% (+)
-    queue_reduction: 27.70% (+)
-    throughput_increase: 2.67% (+)
-    mae_reduction: 85.87% (-)
+    waiting_time_reduction: 28.71% (+)
+    queue_reduction: 27.40% (+)
+    throughput_increase: 2.56% (+)
+    mae_reduction: 87.56% (-)
 
 --------------------------------------------------------------------------------
 NETWORK STRESS RESILIENCE
 --------------------------------------------------------------------------------
-  ideal: MAE=2.3018 [OK]
-  normal: MAE=2.3242 [OK]
-  degraded: MAE=2.3142 [OK]
-  stressed: MAE=2.3211 [OK]
-  extreme: MAE=2.2938 [OK]
+  ideal: MAE=2.2934 [OK]
+  normal: MAE=2.3312 [OK]
+  degraded: MAE=2.3086 [OK]
+  stressed: MAE=2.3337 [OK]
+  extreme: MAE=2.2953 [OK]
 
 ================================================================================
 KEY CONCLUSIONS

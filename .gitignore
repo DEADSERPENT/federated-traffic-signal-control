@@ -191,3 +191,16 @@ credentials.json
 !requirements.txt
 !Dockerfile
 !docker-compose.yml
+
+
+# Virtual environment
+venv/
+env/
+.venv/
+.env/
+ENV/
+
+# NS-3 Linux / WSL virtual environment
+venv_ns3/
+ns3_simulation/venv_ns3/
+ns3_simulation/venv_ns3/**

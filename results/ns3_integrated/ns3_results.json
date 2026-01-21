@@ -1,6 +1,6 @@
 {
   "metadata": {
-    "timestamp": "2026-01-20T15:59:58.591809",
+    "timestamp": "2026-01-21T00:14:14.959625",
     "ns3_enabled": false,
     "network_scenario": "normal",
     "num_rounds": 50
@@ -10,12 +10,12 @@
     "avg_queue_length": 20.064583333333335
   },
   "local_ml": {
-    "avg_waiting_time": 9.547868663111796,
-    "mae": 2.1753498017787933
+    "avg_waiting_time": 9.460511111504353,
+    "mae": 2.178593099117279
   },
   "federated_learning": {
-    "avg_waiting_time": 9.231558117369238,
-    "mae": 2.1875291913747787,
+    "avg_waiting_time": 9.084812793722776,
+    "mae": 2.1793710440397263,
     "network_metrics": [
       {
         "round": 1,

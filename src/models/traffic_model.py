@@ -184,10 +184,15 @@ def train_model(
     learning_rate: float = 0.001,
     weight_decay: float = 1e-4,
     use_scheduler: bool = True,
-    gradient_clip: float = 1.0
+    gradient_clip: float = 1.0,
+    global_model: nn.Module = None,
+    mu: float = 0.01
 ) -> Tuple[nn.Module, List[float]]:
     """
-    Enhanced training with advanced techniques for better FL performance.
+    Enhanced training with FedProx support for better FL performance.
+
+    FedProx adds a proximal term that prevents local models from drifting
+    too far from the global model, improving convergence on Non-IID data.
 
     Args:
         model: PyTorch model to train
@@ -198,6 +203,8 @@ def train_model(
         weight_decay: L2 regularization weight decay
         use_scheduler: Whether to use learning rate scheduler
         gradient_clip: Max gradient norm for clipping
+        global_model: Global model for FedProx (None for standard training)
+        mu: FedProx proximal term weight (0.01-0.1 recommended)
 
     Returns:
         Tuple of (trained model, loss history)
@@ -222,12 +229,17 @@ def train_model(
         betas=(0.9, 0.999)
     )
 
-    # Cosine annealing scheduler for better convergence
+    # Cosine annealing scheduler - keep learning active longer
     scheduler = None
     if use_scheduler and epochs > 1:
         scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(
-            optimizer, T_max=epochs, eta_min=learning_rate * 0.01
+            optimizer, T_max=epochs, eta_min=learning_rate * 0.1
         )
+
+    # Freeze global model parameters for FedProx
+    global_params = None
+    if global_model is not None and mu > 0:
+        global_params = [p.clone().detach() for p in global_model.parameters()]
 
     model.train()
     loss_history = []
@@ -240,6 +252,14 @@ def train_model(
             optimizer.zero_grad()
             predictions = model(batch_features)
             loss = criterion(predictions, batch_labels)
+
+            # FedProx: Add proximal term to prevent drift from global model
+            if global_params is not None:
+                proximal_term = 0.0
+                for local_param, global_param in zip(model.parameters(), global_params):
+                    proximal_term += torch.sum((local_param - global_param) ** 2)
+                loss = loss + (mu / 2.0) * proximal_term
+
             loss.backward()
 
             # Gradient clipping for stability

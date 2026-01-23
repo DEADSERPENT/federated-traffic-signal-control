@@ -344,14 +344,18 @@ python run_with_ns3.py --rounds 50
 ## Citation
 
 ```bibtex
-@inproceedings{fl-traffic-cloudsim-ns3-2024,
-  title={Federated Learning-based Adaptive Traffic Signal Control
-         with CloudSim Edge Computing and NS-3 Network Simulation},
+@article{resilnet-fl-2025,
+  title={{ResilNet-FL}: A Privacy-Preserving and Network-Resilient Federated
+         Learning Framework for Intelligent Traffic Signal Control},
   author={Your Name},
-  booktitle={IEEE International Conference on Intelligent Transportation Systems},
-  year={2024},
-  keywords={Federated Learning, CloudSim, NS-3, Traffic Signal Control,
-            Edge Computing, V2I Communication, Privacy-Preserving ML}
+  journal={IEEE Transactions on Intelligent Transportation Systems},
+  year={2025},
+  volume={},
+  number={},
+  pages={},
+  doi={},
+  keywords={Federated Learning, Traffic Signal Control, Privacy-Preserving ML,
+            NS-3, CloudSim, Edge Computing, V2I Communication}
 }
 ```
 

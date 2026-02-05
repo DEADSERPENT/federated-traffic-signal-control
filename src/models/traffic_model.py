@@ -2,13 +2,22 @@
 Traffic Signal Optimization Model
 Neural network model for predicting optimal green signal duration.
 Optimized architecture for Federated Learning performance.
+
+GPU-Agnostic: Automatically uses GPU when available, falls back to CPU.
 """
 
 import torch
 import torch.nn as nn
 import numpy as np
-from typing import List, Tuple
+from typing import List, Tuple, Optional
 from collections import OrderedDict
+import sys
+import os
+
+# Add parent directory for imports
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+from utils.device import get_device, to_device
 
 
 class TrafficSignalModel(nn.Module):
@@ -36,7 +45,8 @@ class TrafficSignalModel(nn.Module):
         hidden_layers: List[int] = None,
         output_dim: int = 1,
         use_batch_norm: bool = True,
-        dropout_rate: float = 0.1
+        dropout_rate: float = 0.1,
+        device: Optional[torch.device] = None
     ):
         """
         Initialize the model.
@@ -47,8 +57,12 @@ class TrafficSignalModel(nn.Module):
             output_dim: Number of output values
             use_batch_norm: Whether to use batch normalization
             dropout_rate: Dropout rate for regularization
+            device: Device to use (auto-detected if None)
         """
         super(TrafficSignalModel, self).__init__()
+
+        # Set device - auto-detect if not specified
+        self._device = device if device is not None else get_device()
 
         if hidden_layers is None:
             hidden_layers = [128, 64, 32]  # Deeper default architecture
@@ -75,6 +89,9 @@ class TrafficSignalModel(nn.Module):
 
         # Initialize weights for better convergence
         self._initialize_weights()
+
+        # Move model to device
+        self.to(self._device)
 
     def _initialize_weights(self):
         """Initialize weights using Kaiming initialization for ReLU networks."""
@@ -103,11 +120,11 @@ class TrafficSignalModel(nn.Module):
         """
         self.eval()
         with torch.no_grad():
-            x = torch.FloatTensor(features)
+            x = torch.FloatTensor(features).to(self._device)
             if x.dim() == 1:
                 x = x.unsqueeze(0)
             predictions = self.forward(x)
-            return predictions.numpy().flatten()
+            return predictions.cpu().numpy().flatten()
 
     def get_parameters(self) -> List[np.ndarray]:
         """Get model state dict values as list of numpy arrays (includes BatchNorm buffers)."""
@@ -118,7 +135,7 @@ class TrafficSignalModel(nn.Module):
         state_dict = self.state_dict()
         keys = list(state_dict.keys())
         for key, param in zip(keys, parameters):
-            state_dict[key] = torch.tensor(param)
+            state_dict[key] = torch.tensor(param, device=self._device)
         self.load_state_dict(state_dict, strict=True)
 
     def get_state_keys(self) -> List[str]:
@@ -129,9 +146,11 @@ class TrafficSignalModel(nn.Module):
 class LinearRegressionModel(nn.Module):
     """Simple linear regression model for baseline comparison."""
 
-    def __init__(self, input_dim: int = 6, output_dim: int = 1):
+    def __init__(self, input_dim: int = 6, output_dim: int = 1, device: Optional[torch.device] = None):
         super(LinearRegressionModel, self).__init__()
+        self._device = device if device is not None else get_device()
         self.linear = nn.Linear(input_dim, output_dim)
+        self.to(self._device)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         return self.linear(x)
@@ -145,22 +164,32 @@ class LinearRegressionModel(nn.Module):
         state_dict = self.state_dict()
         keys = list(state_dict.keys())
         for key, param in zip(keys, parameters):
-            state_dict[key] = torch.tensor(param)
+            state_dict[key] = torch.tensor(param, device=self._device)
         self.load_state_dict(state_dict, strict=True)
 
 
-def create_model(model_type: str = "neural_network", optimized: bool = True, **kwargs) -> nn.Module:
+def create_model(
+    model_type: str = "neural_network",
+    optimized: bool = True,
+    device: Optional[torch.device] = None,
+    **kwargs
+) -> nn.Module:
     """
     Factory function to create traffic signal models.
 
     Args:
         model_type: "neural_network" or "linear_regression"
         optimized: Use optimized architecture for FL (deeper network)
+        device: Device to use (auto-detected if None)
         **kwargs: Additional arguments for model initialization
 
     Returns:
-        PyTorch model instance
+        PyTorch model instance on the specified device
     """
+    # Get device if not specified
+    if device is None:
+        device = get_device()
+
     if model_type == "neural_network":
         # Use optimized architecture by default
         if optimized and "hidden_layers" not in kwargs:
@@ -169,9 +198,9 @@ def create_model(model_type: str = "neural_network", optimized: bool = True, **k
             kwargs["use_batch_norm"] = True
         if "dropout_rate" not in kwargs:
             kwargs["dropout_rate"] = 0.1
-        return TrafficSignalModel(**kwargs)
+        return TrafficSignalModel(device=device, **kwargs)
     elif model_type == "linear_regression":
-        return LinearRegressionModel(**kwargs)
+        return LinearRegressionModel(device=device, **kwargs)
     else:
         raise ValueError(f"Unknown model type: {model_type}")
 
@@ -186,7 +215,8 @@ def train_model(
     use_scheduler: bool = True,
     gradient_clip: float = 1.0,
     global_model: nn.Module = None,
-    mu: float = 0.01
+    mu: float = 0.01,
+    device: Optional[torch.device] = None
 ) -> Tuple[nn.Module, List[float]]:
     """
     Enhanced training with FedProx support for better FL performance.
@@ -205,13 +235,21 @@ def train_model(
         gradient_clip: Max gradient norm for clipping
         global_model: Global model for FedProx (None for standard training)
         mu: FedProx proximal term weight (0.01-0.1 recommended)
+        device: Device to use (auto-detected if None)
 
     Returns:
         Tuple of (trained model, loss history)
     """
+    # Get device from model or auto-detect
+    if device is None:
+        if hasattr(model, '_device'):
+            device = model._device
+        else:
+            device = get_device()
+
     features, labels = train_data
-    features = torch.FloatTensor(features)
-    labels = torch.FloatTensor(labels).unsqueeze(1)
+    features = torch.FloatTensor(features).to(device)
+    labels = torch.FloatTensor(labels).unsqueeze(1).to(device)
 
     dataset = torch.utils.data.TensorDataset(features, labels)
     dataloader = torch.utils.data.DataLoader(
@@ -239,7 +277,7 @@ def train_model(
     # Freeze global model parameters for FedProx
     global_params = None
     if global_model is not None and mu > 0:
-        global_params = [p.clone().detach() for p in global_model.parameters()]
+        global_params = [p.clone().detach().to(device) for p in global_model.parameters()]
 
     model.train()
     loss_history = []
@@ -282,7 +320,8 @@ def train_model(
 
 def evaluate_model(
     model: nn.Module,
-    test_data: Tuple[np.ndarray, np.ndarray]
+    test_data: Tuple[np.ndarray, np.ndarray],
+    device: Optional[torch.device] = None
 ) -> Tuple[float, float]:
     """
     Evaluate the model on test data.
@@ -290,13 +329,21 @@ def evaluate_model(
     Args:
         model: PyTorch model to evaluate
         test_data: Tuple of (features, labels)
+        device: Device to use (auto-detected if None)
 
     Returns:
         Tuple of (MSE loss, MAE)
     """
+    # Get device from model or auto-detect
+    if device is None:
+        if hasattr(model, '_device'):
+            device = model._device
+        else:
+            device = get_device()
+
     features, labels = test_data
-    features = torch.FloatTensor(features)
-    labels = torch.FloatTensor(labels).unsqueeze(1)
+    features = torch.FloatTensor(features).to(device)
+    labels = torch.FloatTensor(labels).unsqueeze(1).to(device)
 
     model.eval()
     with torch.no_grad():
@@ -308,13 +355,20 @@ def evaluate_model(
 
 
 if __name__ == "__main__":
-    # Test the enhanced model
-    print("Testing Enhanced Traffic Signal Model...")
+    # Test the enhanced model with GPU/CPU auto-detection
+    print("="*60)
+    print("Testing Enhanced Traffic Signal Model with GPU/CPU Support")
+    print("="*60)
 
-    # Create optimized model
+    # Show device info
+    device = get_device()
+    print(f"\nUsing device: {device}")
+
+    # Create optimized model (automatically on best device)
     model = create_model("neural_network", hidden_layers=[128, 64, 32])
-    print(f"Model architecture:\n{model}")
+    print(f"\nModel architecture:\n{model}")
     print(f"\nTotal parameters: {sum(p.numel() for p in model.parameters())}")
+    print(f"Model device: {model._device}")
 
     # Generate dummy data
     np.random.seed(42)
@@ -340,3 +394,7 @@ if __name__ == "__main__":
     sample_features = features[0]
     prediction = model.predict(sample_features)
     print(f"\nSample prediction: {prediction[0]:.2f} seconds")
+
+    print("\n" + "="*60)
+    print("GPU/CPU support test completed successfully!")
+    print("="*60)

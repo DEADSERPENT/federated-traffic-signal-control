@@ -2,17 +2,20 @@
 Adaptive Federated Learning Traffic Signal Controller
 Uses FL to train a global model shared across intersections.
 OPTIMIZED VERSION - Designed to outperform all other methods.
+
+GPU-Agnostic: Automatically uses GPU when available, falls back to CPU.
 """
 
 import numpy as np
 import torch
-from typing import Dict, List, Tuple
+from typing import Dict, List, Tuple, Optional
 import sys
 import os
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from models.traffic_model import create_model, train_model, evaluate_model
+from utils.device import get_device, is_gpu_available
 
 
 class AdaptiveFLController:
@@ -38,7 +41,8 @@ class AdaptiveFLController:
         weight_decay: float = 5e-5,  # Less regularization for better fit
         min_lr: float = 0.0001,
         use_fedprox: bool = True,  # Enable FedProx by default
-        mu: float = 0.05  # FedProx proximal term weight
+        mu: float = 0.05,  # FedProx proximal term weight
+        device: Optional[torch.device] = None  # GPU/CPU device
     ):
         self.num_intersections = num_intersections
         # DEEPER architecture for superior representation
@@ -53,22 +57,27 @@ class AdaptiveFLController:
         self.use_fedprox = use_fedprox
         self.mu = mu
 
-        # Create local models with OPTIMIZED architecture
+        # Set device - auto-detect if not specified
+        self.device = device if device is not None else get_device()
+
+        # Create local models with OPTIMIZED architecture (on device)
         self.local_models = {}
         for i in range(num_intersections):
             self.local_models[i] = create_model(
                 "neural_network",
                 hidden_layers=self.hidden_layers,
                 use_batch_norm=True,
-                dropout_rate=0.05  # Less dropout for better accuracy
+                dropout_rate=0.05,  # Less dropout for better accuracy
+                device=self.device
             )
 
-        # Global model - the SUPERIOR model
+        # Global model - the SUPERIOR model (on device)
         self.global_model = create_model(
             "neural_network",
             hidden_layers=self.hidden_layers,
             use_batch_norm=True,
-            dropout_rate=0.05
+            dropout_rate=0.05,
+            device=self.device
         )
 
         self.round_metrics = []
@@ -133,6 +142,7 @@ class AdaptiveFLController:
             Training metrics per round
         """
         print(f"\nStarting Enhanced Federated Learning ({self.num_rounds} rounds)...")
+        print(f"  Device: {self.device} ({'GPU' if is_gpu_available() else 'CPU'})")
         print(f"  Architecture: {self.hidden_layers}")
         print(f"  Initial LR: {self.learning_rate}, Decay: {self.lr_decay}")
         print(f"  FedProx: {'Enabled (mu=' + str(self.mu) + ')' if self.use_fedprox else 'Disabled'}")

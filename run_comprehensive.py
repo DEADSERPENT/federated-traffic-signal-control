@@ -33,6 +33,10 @@ import argparse
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'src'))
 
 from experiments.comprehensive_runner import run_comprehensive_experiment
+from utils.device import get_device, is_gpu_available
+
+# Get device at module level
+DEVICE = get_device()
 
 
 def main():
@@ -43,6 +47,7 @@ def main():
 Examples:
     python run_comprehensive.py              # Full experiment (~10-15 mins)
     python run_comprehensive.py --quick      # Quick mode (~5 mins)
+    python run_comprehensive.py --device cpu # Force CPU execution
 
 This will generate:
     - Performance comparison: Fixed-Time vs Local-ML vs Federated Learning
@@ -59,6 +64,14 @@ This will generate:
     )
 
     parser.add_argument(
+        "--device",
+        type=str,
+        choices=["auto", "cpu", "cuda", "mps"],
+        default="auto",
+        help="Device to use: auto (default), cpu, cuda, or mps"
+    )
+
+    parser.add_argument(
         "--seed",
         type=int,
         default=42,
@@ -66,6 +79,10 @@ This will generate:
     )
 
     args = parser.parse_args()
+
+    # Set device via environment variable if specified
+    if args.device != "auto":
+        os.environ['RESILNET_DEVICE'] = args.device
 
     print("""
     ======================================================================
@@ -82,6 +99,7 @@ This will generate:
     else:
         print("    Mode: FULL (all experiments)")
 
+    print(f"    Device: {DEVICE} ({'GPU' if is_gpu_available() else 'CPU'})")
     print(f"    Seed: {args.seed}")
     print()
 

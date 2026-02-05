@@ -9,6 +9,8 @@ This script runs comprehensive experiments for IEEE publication:
 3. Ablation study
 4. Statistical analysis (mean ± std, confidence intervals)
 
+GPU-Agnostic: Automatically uses GPU when available, falls back to CPU.
+
 Author: FL Traffic Signal Control Project
 """
 
@@ -31,13 +33,18 @@ import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.patches as mpatches
 from scipy import stats
+import torch
 
 from utils.reproducibility import set_global_seed
+from utils.device import get_device, is_gpu_available
 from traffic_generator import TrafficDataGenerator
 from baselines.fixed_time import FixedTimeController
 from baselines.local_ml import LocalMLController
 from baselines.adaptive_fl import AdaptiveFLController
 from baselines.actuated import ActuatedController
+
+# Get device at module level (will print device info once)
+DEVICE = get_device()
 
 
 def run_single_experiment(seed: int, num_rounds: int = 50) -> Dict:
@@ -601,8 +608,14 @@ def main():
     parser.add_argument("--rounds", type=int, default=50, help="FL rounds per run")
     parser.add_argument("--ablation", action="store_true", help="Run ablation study")
     parser.add_argument("--output", type=str, default="results/ieee", help="Output directory")
+    parser.add_argument("--device", type=str, choices=["auto", "cpu", "cuda", "mps"],
+                       default="auto", help="Device to use (auto-detect by default)")
 
     args = parser.parse_args()
+
+    # Set device via environment variable if specified
+    if args.device != "auto":
+        os.environ['RESILNET_DEVICE'] = args.device
 
     output_dir = Path(args.output)
     output_dir.mkdir(parents=True, exist_ok=True)
@@ -610,6 +623,7 @@ def main():
     print("\n" + "="*70)
     print("  IEEE-READY EXPERIMENTAL EVALUATION")
     print("  FL Traffic Signal Control with NS-3 Integration")
+    print(f"  Device: {DEVICE} ({'GPU' if is_gpu_available() else 'CPU'})")
     print("="*70)
 
     # Run multiple experiments

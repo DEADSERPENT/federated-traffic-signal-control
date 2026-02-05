@@ -1,6 +1,7 @@
 """
 Reproducibility utilities for consistent experimental results.
 Fixes random seeds across all libraries.
+Integrates with device management for GPU/CPU portability.
 """
 
 import random
@@ -8,13 +9,17 @@ import numpy as np
 import torch
 import os
 
+from utils.device import get_device, is_gpu_available
 
-def set_global_seed(seed: int = 42):
+
+def set_global_seed(seed: int = 42, verbose: bool = True):
     """
     Set random seed for all libraries to ensure reproducibility.
+    Works on both GPU and CPU systems.
 
     Args:
         seed: Random seed value
+        verbose: Whether to print status messages
     """
     # Python random
     random.seed(seed)
@@ -22,20 +27,28 @@ def set_global_seed(seed: int = 42):
     # NumPy
     np.random.seed(seed)
 
-    # PyTorch
+    # PyTorch CPU
     torch.manual_seed(seed)
+
+    # PyTorch CUDA (if available)
     if torch.cuda.is_available():
         torch.cuda.manual_seed(seed)
         torch.cuda.manual_seed_all(seed)
+        # Make PyTorch deterministic on GPU
+        torch.backends.cudnn.deterministic = True
+        torch.backends.cudnn.benchmark = False
 
-    # Make PyTorch deterministic
-    torch.backends.cudnn.deterministic = True
-    torch.backends.cudnn.benchmark = False
+    # PyTorch MPS (Apple Silicon) - set seed if available
+    if hasattr(torch.backends, 'mps') and torch.backends.mps.is_available():
+        # MPS uses the same manual_seed
+        pass  # Already set via torch.manual_seed
 
     # Environment variable for hash seed
     os.environ['PYTHONHASHSEED'] = str(seed)
 
-    print(f"[Reproducibility] Global seed set to {seed}")
+    if verbose:
+        device = get_device()
+        print(f"[Reproducibility] Global seed set to {seed} (device: {device})")
 
 
 def get_experiment_id() -> str:

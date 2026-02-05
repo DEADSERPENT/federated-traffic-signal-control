@@ -2,17 +2,20 @@
 Local ML Traffic Signal Controller
 Each intersection trains its own model without federated learning.
 Used as baseline to show FL benefits.
+
+GPU-Agnostic: Automatically uses GPU when available, falls back to CPU.
 """
 
 import numpy as np
 import torch
-from typing import Dict, List, Tuple
+from typing import Dict, List, Tuple, Optional
 import sys
 import os
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from models.traffic_model import create_model, train_model, evaluate_model
+from utils.device import get_device, is_gpu_available
 
 
 class LocalMLController:
@@ -27,19 +30,24 @@ class LocalMLController:
         num_intersections: int = 4,
         hidden_layers: List[int] = None,
         local_epochs: int = 10,
-        learning_rate: float = 0.01
+        learning_rate: float = 0.01,
+        device: Optional[torch.device] = None  # GPU/CPU device
     ):
         self.num_intersections = num_intersections
         self.hidden_layers = hidden_layers or [64, 32]
         self.local_epochs = local_epochs
         self.learning_rate = learning_rate
 
-        # Create separate model for each intersection
+        # Set device - auto-detect if not specified
+        self.device = device if device is not None else get_device()
+
+        # Create separate model for each intersection (on device)
         self.models = {}
         for i in range(num_intersections):
             self.models[i] = create_model(
                 "neural_network",
-                hidden_layers=self.hidden_layers
+                hidden_layers=self.hidden_layers,
+                device=self.device
             )
 
         self.training_history = {}
@@ -62,6 +70,7 @@ class LocalMLController:
         """
         epochs = epochs or self.local_epochs
 
+        print(f"  Device: {self.device} ({'GPU' if is_gpu_available() else 'CPU'})")
         for intersection_id, (features, labels) in training_data.items():
             print(f"  Training Local Model for Intersection {intersection_id}...")
 

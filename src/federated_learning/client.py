@@ -1,13 +1,15 @@
 """
 Federated Learning Client
 Edge node client representing a traffic intersection.
+
+GPU-Agnostic: Automatically uses GPU when available, falls back to CPU.
 """
 
 import flwr as fl
 from flwr.common import NDArrays, Scalar
 import numpy as np
 import torch
-from typing import Dict, List, Tuple
+from typing import Dict, List, Tuple, Optional
 import sys
 import os
 
@@ -16,6 +18,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from models.traffic_model import create_model, train_model, evaluate_model
 from traffic_generator.generator import TrafficDataGenerator
+from utils.device import get_device, is_gpu_available
 
 
 class TrafficClient(fl.client.NumPyClient):
@@ -27,7 +30,8 @@ class TrafficClient(fl.client.NumPyClient):
     def __init__(
         self,
         intersection_id: int,
-        config: Dict = None
+        config: Dict = None,
+        device: Optional[torch.device] = None  # GPU/CPU device
     ):
         """
         Initialize the traffic client.
@@ -35,15 +39,20 @@ class TrafficClient(fl.client.NumPyClient):
         Args:
             intersection_id: ID of the traffic intersection
             config: Configuration dictionary
+            device: Device to use (auto-detected if None)
         """
         self.intersection_id = intersection_id
         self.config = config or {}
+
+        # Set device - auto-detect if not specified
+        self.device = device if device is not None else get_device()
 
         # Model configuration
         model_config = self.config.get("model", {})
         self.model = create_model(
             model_type=model_config.get("type", "neural_network"),
-            hidden_layers=model_config.get("hidden_layers", [64, 32])
+            hidden_layers=model_config.get("hidden_layers", [64, 32]),
+            device=self.device
         )
 
         # Training configuration
@@ -58,7 +67,7 @@ class TrafficClient(fl.client.NumPyClient):
         # Generate local training and test data
         self._prepare_data()
 
-        print(f"Client {intersection_id} initialized with {len(self.train_features)} training samples")
+        print(f"Client {intersection_id} initialized with {len(self.train_features)} training samples (device: {self.device})")
 
     def _prepare_data(self):
         """Prepare local training and test data."""

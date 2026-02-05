@@ -4,7 +4,7 @@ COMPREHENSIVE EXPERIMENT REPORT
 Federated Learning-based Adaptive Traffic Signal Control
 ================================================================================
 
-Experiment Date: 2026-01-18T08:40:56.515543
+Experiment Date: 2026-02-05T16:37:14.399074
 Random Seed: 42
 Intersections: 4
 Simulation Duration: 1800s
@@ -16,64 +16,72 @@ PERFORMANCE COMPARISON TABLE
 
 Metric            Fixed-Time        Local-ML          Federated-Learning
 ------------------------------------------------------------------------
-Avg Wait Time (s) 13.3455           9.5439            9.5143            
-Avg Queue Length  20.0646           14.5861           14.5660           
-Throughput/hr     20338.0000        20894.0000        20858.0000        
-MSE               0                 18.7110           12.8111           
-MAE               0                 2.1757            1.8756            
+Avg Wait Time (s) 13.3455           9.4597            9.3212            
+Avg Queue Length  20.0646           14.5660           14.0951           
+Throughput/hr     20338.0000        20866.0000        20894.0000        
+MSE               0                 18.9805           12.4062           
+MAE               0                 2.1788            1.8404            
 
 --------------------------------------------------------------------------------
 IMPROVEMENTS OVER BASELINE (Fixed-Time)
 --------------------------------------------------------------------------------
 
 Local-ML:
-  waiting_time_reduction: 28.49% (+)
-  queue_reduction: 27.30% (+)
-  throughput_increase: 2.73% (+)
-  mae_reduction: 117.57% (-)
+  waiting_time_reduction: 29.12% (+)
+  queue_reduction: 27.40% (+)
+  throughput_increase: 2.60% (+)
+  mae_reduction: 117.88% (-)
 
 Federated-Learning:
-  waiting_time_reduction: 28.71% (+)
-  queue_reduction: 27.40% (+)
-  throughput_increase: 2.56% (+)
-  mae_reduction: 87.56% (-)
+  waiting_time_reduction: 30.16% (+)
+  queue_reduction: 29.75% (+)
+  throughput_increase: 2.73% (+)
+  mae_reduction: 84.04% (-)
 ================================================================================
 
 
 --------------------------------------------------------------------------------
 FEDERATED LEARNING RESULTS
 --------------------------------------------------------------------------------
-  Final MSE: 12.8111
-  Final MAE: 1.8756
+  Final MSE: 12.4062
+  Final MAE: 1.8404
   Total Rounds: 100
-  Convergence Rate: 41.95%
+  Convergence Rate: 40.70%
   Rounds to 90% Improvement: 3
-  Final Stability: 0.0063
+  Final Stability: 0.0073
 
 --------------------------------------------------------------------------------
 IMPROVEMENTS OVER BASELINE
 --------------------------------------------------------------------------------
 
   Local-ML:
-    waiting_time_reduction: 28.49% (+)
-    queue_reduction: 27.30% (+)
-    throughput_increase: 2.73% (+)
-    mae_reduction: 117.57% (-)
+    waiting_time_reduction: 29.12% (+)
+    queue_reduction: 27.40% (+)
+    throughput_increase: 2.60% (+)
+    mae_reduction: 117.88% (-)
 
   Federated-Learning:
-    waiting_time_reduction: 28.71% (+)
-    queue_reduction: 27.40% (+)
-    throughput_increase: 2.56% (+)
-    mae_reduction: 87.56% (-)
+    waiting_time_reduction: 30.16% (+)
+    queue_reduction: 29.75% (+)
+    throughput_increase: 2.73% (+)
+    mae_reduction: 84.04% (-)
 
 --------------------------------------------------------------------------------
 NETWORK STRESS RESILIENCE
 --------------------------------------------------------------------------------
-  ideal: MAE=2.2934 [OK]
-  normal: MAE=2.3312 [OK]
-  degraded: MAE=2.3086 [OK]
-  stressed: MAE=2.3337 [OK]
-  extreme: MAE=2.2953 [OK]
+  ideal: MAE=2.2917 [OK]
+  normal: MAE=2.3170 [OK]
+  degraded: MAE=2.3104 [OK]
+  stressed: MAE=2.3179 [OK]
+  extreme: MAE=2.2942 [OK]
+
+--------------------------------------------------------------------------------
+SCALABILITY
+--------------------------------------------------------------------------------
+  2 clients: MAE=2.3276, Time=16.3s
+  4 clients: MAE=2.8804, Time=32.7s
+  6 clients: MAE=1.8997, Time=49.7s
+  8 clients: MAE=2.3111, Time=61.8s
 
 ================================================================================
 KEY CONCLUSIONS

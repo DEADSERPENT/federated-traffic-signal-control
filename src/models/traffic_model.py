@@ -168,6 +168,270 @@ class LinearRegressionModel(nn.Module):
         self.load_state_dict(state_dict, strict=True)
 
 
+class LSTMTrafficModel(nn.Module):
+    """
+    LSTM-based model for time-series traffic prediction.
+
+    Captures temporal dependencies in traffic patterns:
+    - Queue length at time t depends on queue length at t-1, t-2, etc.
+    - Rush hour patterns, periodic fluctuations
+    - Event-driven traffic spikes
+
+    Input: Sequence of traffic states [batch, seq_len, features]
+    Output: Predicted optimal green duration
+    """
+
+    def __init__(
+        self,
+        input_dim: int = 6,
+        hidden_dim: int = 64,
+        num_layers: int = 2,
+        output_dim: int = 1,
+        dropout_rate: float = 0.1,
+        bidirectional: bool = False,
+        device: Optional[torch.device] = None
+    ):
+        """
+        Initialize LSTM model.
+
+        Args:
+            input_dim: Number of input features per timestep
+            hidden_dim: LSTM hidden state dimension
+            num_layers: Number of stacked LSTM layers
+            output_dim: Output dimension (1 for green duration)
+            dropout_rate: Dropout for regularization
+            bidirectional: Use bidirectional LSTM
+            device: Device to use
+        """
+        super(LSTMTrafficModel, self).__init__()
+
+        self._device = device if device is not None else get_device()
+        self.hidden_dim = hidden_dim
+        self.num_layers = num_layers
+        self.bidirectional = bidirectional
+        self.num_directions = 2 if bidirectional else 1
+
+        # LSTM layer
+        self.lstm = nn.LSTM(
+            input_size=input_dim,
+            hidden_size=hidden_dim,
+            num_layers=num_layers,
+            batch_first=True,
+            dropout=dropout_rate if num_layers > 1 else 0,
+            bidirectional=bidirectional
+        )
+
+        # Fully connected layers after LSTM
+        fc_input_dim = hidden_dim * self.num_directions
+        self.fc = nn.Sequential(
+            nn.Linear(fc_input_dim, hidden_dim),
+            nn.LeakyReLU(0.1),
+            nn.Dropout(dropout_rate),
+            nn.Linear(hidden_dim, output_dim)
+        )
+
+        self._initialize_weights()
+        self.to(self._device)
+
+    def _initialize_weights(self):
+        """Initialize LSTM and FC weights."""
+        for name, param in self.lstm.named_parameters():
+            if 'weight_ih' in name:
+                nn.init.xavier_uniform_(param)
+            elif 'weight_hh' in name:
+                nn.init.orthogonal_(param)
+            elif 'bias' in name:
+                nn.init.zeros_(param)
+                # Set forget gate bias to 1 for better gradient flow
+                n = param.size(0)
+                param.data[n//4:n//2].fill_(1.0)
+
+        for module in self.fc.modules():
+            if isinstance(module, nn.Linear):
+                nn.init.kaiming_normal_(module.weight)
+                nn.init.zeros_(module.bias)
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        """
+        Forward pass.
+
+        Args:
+            x: Input tensor of shape [batch, seq_len, features] or [batch, features]
+
+        Returns:
+            Predicted green duration [batch, 1]
+        """
+        # Handle non-sequence input (single timestep)
+        if x.dim() == 2:
+            x = x.unsqueeze(1)  # Add sequence dimension
+
+        # LSTM forward pass
+        lstm_out, (h_n, c_n) = self.lstm(x)
+
+        # Use last hidden state (or concatenated for bidirectional)
+        if self.bidirectional:
+            # Concatenate forward and backward final hidden states
+            hidden = torch.cat((h_n[-2], h_n[-1]), dim=1)
+        else:
+            hidden = h_n[-1]
+
+        # FC layers
+        output = self.fc(hidden)
+        return output
+
+    def predict(self, features: np.ndarray) -> np.ndarray:
+        """Make predictions on numpy array input."""
+        self.eval()
+        with torch.no_grad():
+            x = torch.FloatTensor(features).to(self._device)
+            if x.dim() == 1:
+                x = x.unsqueeze(0)
+            predictions = self.forward(x)
+            return predictions.cpu().numpy().flatten()
+
+    def get_parameters(self) -> List[np.ndarray]:
+        """Get model parameters as list of numpy arrays."""
+        return [val.cpu().detach().numpy() for val in self.state_dict().values()]
+
+    def set_parameters(self, parameters: List[np.ndarray]):
+        """Set model parameters from list of numpy arrays."""
+        state_dict = self.state_dict()
+        keys = list(state_dict.keys())
+        for key, param in zip(keys, parameters):
+            state_dict[key] = torch.tensor(param, device=self._device)
+        self.load_state_dict(state_dict, strict=True)
+
+
+class GRUTrafficModel(nn.Module):
+    """
+    GRU-based model for time-series traffic prediction.
+
+    Similar to LSTM but with fewer parameters:
+    - Faster training, lower memory usage
+    - Often performs comparably to LSTM on shorter sequences
+    - Better for edge deployment (smaller model size)
+
+    Input: Sequence of traffic states [batch, seq_len, features]
+    Output: Predicted optimal green duration
+    """
+
+    def __init__(
+        self,
+        input_dim: int = 6,
+        hidden_dim: int = 64,
+        num_layers: int = 2,
+        output_dim: int = 1,
+        dropout_rate: float = 0.1,
+        bidirectional: bool = False,
+        device: Optional[torch.device] = None
+    ):
+        """
+        Initialize GRU model.
+
+        Args:
+            input_dim: Number of input features per timestep
+            hidden_dim: GRU hidden state dimension
+            num_layers: Number of stacked GRU layers
+            output_dim: Output dimension (1 for green duration)
+            dropout_rate: Dropout for regularization
+            bidirectional: Use bidirectional GRU
+            device: Device to use
+        """
+        super(GRUTrafficModel, self).__init__()
+
+        self._device = device if device is not None else get_device()
+        self.hidden_dim = hidden_dim
+        self.num_layers = num_layers
+        self.bidirectional = bidirectional
+        self.num_directions = 2 if bidirectional else 1
+
+        # GRU layer
+        self.gru = nn.GRU(
+            input_size=input_dim,
+            hidden_size=hidden_dim,
+            num_layers=num_layers,
+            batch_first=True,
+            dropout=dropout_rate if num_layers > 1 else 0,
+            bidirectional=bidirectional
+        )
+
+        # Fully connected layers after GRU
+        fc_input_dim = hidden_dim * self.num_directions
+        self.fc = nn.Sequential(
+            nn.Linear(fc_input_dim, hidden_dim),
+            nn.LeakyReLU(0.1),
+            nn.Dropout(dropout_rate),
+            nn.Linear(hidden_dim, output_dim)
+        )
+
+        self._initialize_weights()
+        self.to(self._device)
+
+    def _initialize_weights(self):
+        """Initialize GRU and FC weights."""
+        for name, param in self.gru.named_parameters():
+            if 'weight_ih' in name:
+                nn.init.xavier_uniform_(param)
+            elif 'weight_hh' in name:
+                nn.init.orthogonal_(param)
+            elif 'bias' in name:
+                nn.init.zeros_(param)
+
+        for module in self.fc.modules():
+            if isinstance(module, nn.Linear):
+                nn.init.kaiming_normal_(module.weight)
+                nn.init.zeros_(module.bias)
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        """
+        Forward pass.
+
+        Args:
+            x: Input tensor of shape [batch, seq_len, features] or [batch, features]
+
+        Returns:
+            Predicted green duration [batch, 1]
+        """
+        # Handle non-sequence input (single timestep)
+        if x.dim() == 2:
+            x = x.unsqueeze(1)  # Add sequence dimension
+
+        # GRU forward pass
+        gru_out, h_n = self.gru(x)
+
+        # Use last hidden state (or concatenated for bidirectional)
+        if self.bidirectional:
+            hidden = torch.cat((h_n[-2], h_n[-1]), dim=1)
+        else:
+            hidden = h_n[-1]
+
+        # FC layers
+        output = self.fc(hidden)
+        return output
+
+    def predict(self, features: np.ndarray) -> np.ndarray:
+        """Make predictions on numpy array input."""
+        self.eval()
+        with torch.no_grad():
+            x = torch.FloatTensor(features).to(self._device)
+            if x.dim() == 1:
+                x = x.unsqueeze(0)
+            predictions = self.forward(x)
+            return predictions.cpu().numpy().flatten()
+
+    def get_parameters(self) -> List[np.ndarray]:
+        """Get model parameters as list of numpy arrays."""
+        return [val.cpu().detach().numpy() for val in self.state_dict().values()]
+
+    def set_parameters(self, parameters: List[np.ndarray]):
+        """Set model parameters from list of numpy arrays."""
+        state_dict = self.state_dict()
+        keys = list(state_dict.keys())
+        for key, param in zip(keys, parameters):
+            state_dict[key] = torch.tensor(param, device=self._device)
+        self.load_state_dict(state_dict, strict=True)
+
+
 def create_model(
     model_type: str = "neural_network",
     optimized: bool = True,
@@ -178,7 +442,11 @@ def create_model(
     Factory function to create traffic signal models.
 
     Args:
-        model_type: "neural_network" or "linear_regression"
+        model_type: Model architecture type
+            - "neural_network" or "mlp": Standard MLP (default)
+            - "lstm": LSTM for time-series (captures temporal dependencies)
+            - "gru": GRU for time-series (lighter than LSTM)
+            - "linear_regression": Simple baseline
         optimized: Use optimized architecture for FL (deeper network)
         device: Device to use (auto-detected if None)
         **kwargs: Additional arguments for model initialization
@@ -190,7 +458,7 @@ def create_model(
     if device is None:
         device = get_device()
 
-    if model_type == "neural_network":
+    if model_type in ["neural_network", "mlp"]:
         # Use optimized architecture by default
         if optimized and "hidden_layers" not in kwargs:
             kwargs["hidden_layers"] = [128, 64, 32]
@@ -199,10 +467,33 @@ def create_model(
         if "dropout_rate" not in kwargs:
             kwargs["dropout_rate"] = 0.1
         return TrafficSignalModel(device=device, **kwargs)
+
+    elif model_type == "lstm":
+        # LSTM for time-series traffic prediction
+        if "hidden_dim" not in kwargs:
+            kwargs["hidden_dim"] = 64
+        if "num_layers" not in kwargs:
+            kwargs["num_layers"] = 2
+        if "dropout_rate" not in kwargs:
+            kwargs["dropout_rate"] = 0.1
+        return LSTMTrafficModel(device=device, **kwargs)
+
+    elif model_type == "gru":
+        # GRU for time-series (lighter alternative to LSTM)
+        if "hidden_dim" not in kwargs:
+            kwargs["hidden_dim"] = 64
+        if "num_layers" not in kwargs:
+            kwargs["num_layers"] = 2
+        if "dropout_rate" not in kwargs:
+            kwargs["dropout_rate"] = 0.1
+        return GRUTrafficModel(device=device, **kwargs)
+
     elif model_type == "linear_regression":
         return LinearRegressionModel(device=device, **kwargs)
+
     else:
-        raise ValueError(f"Unknown model type: {model_type}")
+        raise ValueError(f"Unknown model type: {model_type}. "
+                        f"Choose from: neural_network, mlp, lstm, gru, linear_regression")
 
 
 def train_model(

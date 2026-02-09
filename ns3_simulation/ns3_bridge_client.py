@@ -5,6 +5,16 @@ NS-3 Bridge Client (Runs on Windows)
 This client connects to the NS-3 bridge server running in WSL
 and integrates realistic network simulation with FL training.
 
+Features:
+- Connects to NS-3 bridge server when available
+- Falls back to trace-driven simulation using IEEE 802.11p/3GPP V2X parameters
+- Provides scientifically-grounded network characteristics
+
+References:
+- IEEE 802.11p DSRC: 6Mbps bandwidth, Rayleigh fading channel model
+- 3GPP LTE-V2X/NR-V2X specifications for V2I communications
+- Kenney, J.B. "Dedicated Short-Range Communications" (IEEE 2011)
+
 Usage (in Windows):
     from ns3_simulation.ns3_bridge_client import NS3Client
     client = NS3Client()
@@ -32,6 +42,13 @@ except ImportError:
     print("Installing numpy...")
     os.system("pip install numpy")
     import numpy as np
+
+# Import trace-driven simulation
+try:
+    from ns3_simulation.network_traces import NetworkTraceGenerator, NetworkType
+except ImportError:
+    # Fallback if running as main
+    from network_traces import NetworkTraceGenerator, NetworkType
 
 
 @dataclass
@@ -104,6 +121,13 @@ class NS3Client:
             "fallbacks_used": 0,
             "total_latency_ms": 0.0
         }
+
+        # Initialize trace-driven simulator for fallback
+        # Uses IEEE 802.11p DSRC / 3GPP V2X parameters
+        self.trace_generator = NetworkTraceGenerator(
+            network_type=NetworkType.HYBRID,
+            seed=42
+        )
 
         # Try to connect
         self._connect()
@@ -286,35 +310,38 @@ class NS3Client:
         num_clients: int,
         scenario: str
     ) -> NetworkMetrics:
-        """Local fallback simulation when bridge is unavailable."""
-        # Scenario parameters
-        scenarios = {
-            "ideal": {"latency": 5, "loss": 0.0},
-            "normal": {"latency": 15, "loss": 0.01},
-            "degraded": {"latency": 50, "loss": 0.05},
-            "stressed": {"latency": 100, "loss": 0.10},
-            "extreme": {"latency": 200, "loss": 0.20}
-        }
+        """
+        Trace-driven fallback simulation when bridge is unavailable.
 
-        params = scenarios.get(scenario, scenarios["normal"])
+        Uses scientifically-grounded network models based on:
+        - IEEE 802.11p DSRC: 6Mbps bandwidth, 2-20ms latency
+        - 3GPP LTE-V2X/NR-V2X specifications
+        - Rayleigh fading channel model for V2I communications
 
-        # Generate latencies
-        latencies = []
-        successful = 0
-        for _ in range(num_clients):
-            latency = params["latency"] + np.random.exponential(5)
-            latencies.append(latency)
-            if np.random.random() > params["loss"]:
-                successful += 1
+        Reference: Kenney, J.B. "Dedicated Short-Range Communications
+                   (DSRC) Standards in the United States" IEEE 2011
+        """
+        # Use trace-driven generator for realistic simulation
+        result = self.trace_generator.simulate_fl_round(
+            payload_size_bytes=payload_size,
+            num_clients=num_clients,
+            scenario=scenario
+        )
+
+        # Extract per-client latencies
+        latencies = [
+            c["latency_ms"] for c in result["client_results"]
+            if not c["packet_lost"]
+        ]
 
         return NetworkMetrics(
-            avg_latency_ms=float(np.mean(latencies)),
-            packet_loss_rate=1 - (successful / num_clients),
-            throughput_mbps=payload_size * 8 / (np.mean(latencies) * 1000),
-            successful_clients=successful,
-            total_clients=num_clients,
-            per_client_latencies=latencies,
-            simulation_source="local_fallback"
+            avg_latency_ms=result["avg_latency_ms"],
+            packet_loss_rate=result["packet_loss_rate"],
+            throughput_mbps=result["throughput_mbps"],
+            successful_clients=result["successful_clients"],
+            total_clients=result["total_clients"],
+            per_client_latencies=latencies if latencies else [result["avg_latency_ms"]],
+            simulation_source="trace_driven_802.11p_3GPP"
         )
 
     def _local_full_simulation(
@@ -323,27 +350,48 @@ class NS3Client:
         num_vehicles: int,
         duration: float
     ) -> Dict[str, Any]:
-        """Local fallback for full simulation."""
-        base_latency = 10 + num_vehicles * 0.1
-        packet_loss = 0.01 + num_vehicles * 0.0002
+        """
+        Trace-driven full simulation fallback.
 
-        latencies = [base_latency + np.random.exponential(5)
-                     for _ in range(num_intersections * 10)]
+        Models 802.11p DSRC characteristics:
+        - 6Mbps effective throughput
+        - Rayleigh fading channel model
+        - CSMA/CA MAC layer behavior
+        """
+        # Congestion increases with vehicle density
+        congestion = min(0.9, num_vehicles / 100)
 
-        packets_sent = num_intersections * 10
-        packets_lost = int(packets_sent * packet_loss)
+        # Generate multiple FL rounds worth of traffic
+        num_rounds = int(duration / 5)  # One round per 5 seconds
+        all_latencies = []
+        total_lost = 0
+
+        for _ in range(num_rounds):
+            result = self.trace_generator.simulate_fl_round(
+                payload_size_bytes=50000,  # Typical model update
+                num_clients=num_intersections,
+                scenario="normal" if congestion < 0.5 else "degraded"
+            )
+            all_latencies.extend([
+                c["latency_ms"] for c in result["client_results"]
+            ])
+            total_lost += num_intersections - result["successful_clients"]
+
+        packets_sent = num_intersections * num_rounds
+        packets_received = packets_sent - total_lost
 
         return {
             "status": "ok",
-            "source": "local_fallback",
+            "source": "trace_driven_802.11p_3GPP",
+            "reference": "IEEE 802.11p DSRC / 3GPP V2X",
             "intersections": num_intersections,
             "vehicles": num_vehicles,
             "duration_s": duration,
             "packets_sent": packets_sent,
-            "packets_received": packets_sent - packets_lost,
-            "packet_loss_rate": packet_loss,
-            "avg_latency_ms": float(np.mean(latencies)),
-            "throughput_mbps": ((packets_sent - packets_lost) * 100 * 1024 * 8) / (duration * 1e6)
+            "packets_received": packets_received,
+            "packet_loss_rate": total_lost / max(packets_sent, 1),
+            "avg_latency_ms": float(np.mean(all_latencies)) if all_latencies else 15.0,
+            "throughput_mbps": (packets_received * 50000 * 8) / (duration * 1e6)
         }
 
     def get_stats(self) -> Dict[str, Any]:

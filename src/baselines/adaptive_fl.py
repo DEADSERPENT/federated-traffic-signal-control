@@ -3,7 +3,11 @@ Adaptive Federated Learning Traffic Signal Controller
 Uses FL to train a global model shared across intersections.
 OPTIMIZED VERSION - Designed to outperform all other methods.
 
-GPU-Agnostic: Automatically uses GPU when available, falls back to CPU.
+Features:
+- GPU-Agnostic: Automatically uses GPU when available, falls back to CPU
+- FedProx: Handles Non-IID data with proximal term
+- Quality-aware aggregation: Inverse-loss weighted averaging
+- Byzantine-robust: Supports Krum, Trimmed Mean, Median aggregation
 """
 
 import numpy as np
@@ -16,6 +20,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from models.traffic_model import create_model, train_model, evaluate_model
 from utils.device import get_device, is_gpu_available
+from federated_learning.aggregation import robust_aggregate, AggregationStrategy
 
 
 class AdaptiveFLController:
@@ -42,7 +47,9 @@ class AdaptiveFLController:
         min_lr: float = 0.0001,
         use_fedprox: bool = True,  # Enable FedProx by default
         mu: float = 0.05,  # FedProx proximal term weight
-        device: Optional[torch.device] = None  # GPU/CPU device
+        device: Optional[torch.device] = None,  # GPU/CPU device
+        aggregation_strategy: str = "quality_aware",  # Aggregation method
+        num_byzantine: int = 0  # Expected Byzantine clients (for Krum)
     ):
         self.num_intersections = num_intersections
         # DEEPER architecture for superior representation
@@ -56,6 +63,8 @@ class AdaptiveFLController:
         self.current_lr = learning_rate
         self.use_fedprox = use_fedprox
         self.mu = mu
+        self.aggregation_strategy = aggregation_strategy
+        self.num_byzantine = num_byzantine
 
         # Set device - auto-detect if not specified
         self.device = device if device is not None else get_device()
@@ -93,36 +102,57 @@ class AdaptiveFLController:
     def federated_averaging(
         self,
         model_params: List[List[np.ndarray]],
-        weights: List[float] = None
+        weights: List[float] = None,
+        strategy: str = None
     ) -> List[np.ndarray]:
         """
-        Perform weighted FedAvg aggregation.
+        Perform aggregation using the configured strategy.
+
+        Supported strategies:
+        - "quality_aware": Weighted by data size × inverse loss (default)
+        - "fedavg": Standard weighted averaging
+        - "median": Coordinate-wise median (Byzantine-robust)
+        - "trimmed_mean": Remove outliers before averaging
+        - "krum": Select most representative client (Byzantine-tolerant)
+        - "multi_krum": Average top-k representative clients
 
         Args:
             model_params: List of model parameters from each client
             weights: Optional weights for each client (based on data size/quality)
+            strategy: Override the default aggregation strategy
 
         Returns:
-            Weighted averaged parameters
+            Aggregated parameters
         """
-        if weights is None:
-            weights = [1.0 / len(model_params)] * len(model_params)
-        else:
-            # Normalize weights
-            total = sum(weights)
-            weights = [w / total for w in weights]
+        strategy = strategy or self.aggregation_strategy
 
-        avg_params = []
-        for i in range(len(model_params[0])):
-            layer_params = [params[i] for params in model_params]
-            # Ensure float dtype for averaging
-            weighted_avg = np.zeros_like(layer_params[0], dtype=np.float32)
-            for param, weight in zip(layer_params, weights):
-                weighted_avg += param.astype(np.float32) * weight
-            # Preserve original dtype
-            original_dtype = layer_params[0].dtype
-            avg_params.append(weighted_avg.astype(original_dtype))
-        return avg_params
+        # Quality-aware is our custom weighted FedAvg with inverse-loss weighting
+        if strategy == "quality_aware":
+            if weights is None:
+                weights = [1.0 / len(model_params)] * len(model_params)
+            else:
+                # Normalize weights
+                total = sum(weights)
+                weights = [w / total for w in weights]
+
+            avg_params = []
+            for i in range(len(model_params[0])):
+                layer_params = [params[i] for params in model_params]
+                weighted_avg = np.zeros_like(layer_params[0], dtype=np.float32)
+                for param, weight in zip(layer_params, weights):
+                    weighted_avg += param.astype(np.float32) * weight
+                original_dtype = layer_params[0].dtype
+                avg_params.append(weighted_avg.astype(original_dtype))
+            return avg_params
+
+        # Use Byzantine-robust aggregation strategies
+        return robust_aggregate(
+            model_params,
+            weights=weights,
+            strategy=strategy,
+            num_byzantine=self.num_byzantine,
+            trim_ratio=0.1
+        )
 
     def train_federated(
         self,
@@ -146,6 +176,8 @@ class AdaptiveFLController:
         print(f"  Architecture: {self.hidden_layers}")
         print(f"  Initial LR: {self.learning_rate}, Decay: {self.lr_decay}")
         print(f"  FedProx: {'Enabled (mu=' + str(self.mu) + ')' if self.use_fedprox else 'Disabled'}")
+        print(f"  Aggregation: {self.aggregation_strategy}" +
+              (f" (Byzantine tolerance: {self.num_byzantine})" if self.num_byzantine > 0 else ""))
 
         self.current_lr = self.learning_rate
         patience_counter = 0

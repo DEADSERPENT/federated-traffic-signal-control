@@ -8,6 +8,8 @@ This script runs comprehensive experiments for IEEE publication:
 2. Generates publication-quality plots
 3. Ablation study
 4. Statistical analysis (mean ± std, confidence intervals)
+5. Centralized-ML baseline (privacy-accuracy trade-off)
+6. 9-intersection (3x3 SUMO grid) support via --intersections 9
 
 GPU-Agnostic: Automatically uses GPU when available, falls back to CPU.
 
@@ -42,20 +44,40 @@ from baselines.fixed_time import FixedTimeController
 from baselines.local_ml import LocalMLController
 from baselines.adaptive_fl import AdaptiveFLController
 from baselines.actuated import ActuatedController
+from baselines.centralized_ml import CentralizedMLController
 
 # Get device at module level (will print device info once)
 DEVICE = get_device()
 
 
-def run_single_experiment(seed: int, num_rounds: int = 50) -> Dict:
+def _make_generator(num_intersections: int, seed: int = None):
+    """Create a TrafficDataGenerator with optional seed and intersection count."""
+    if seed is not None:
+        set_global_seed(seed)
+    return TrafficDataGenerator(
+        config={"traffic": {"num_intersections": num_intersections,
+                            "simulation_duration": 3600,
+                            "time_step": 5,
+                            "arrival_distribution": "poisson",
+                            "min_arrival_rate": 5,
+                            "max_arrival_rate": 30,
+                            "max_queue_length": 50,
+                            "min_green_duration": 10,
+                            "max_green_duration": 90,
+                            "yellow_duration": 3}}
+    )
+
+
+def run_single_experiment(seed: int, num_rounds: int = 50,
+                          num_intersections: int = 4) -> Dict:
     """Run a single experiment with given seed."""
     set_global_seed(seed)
 
     # Initialize
-    generator = TrafficDataGenerator()
+    generator = _make_generator(num_intersections, seed)
     training_data = generator.get_all_intersections_data()
 
-    results = {"seed": seed}
+    results = {"seed": seed, "num_intersections": num_intersections}
 
     # Fixed-Time
     set_global_seed(seed)
@@ -70,7 +92,7 @@ def run_single_experiment(seed: int, num_rounds: int = 50) -> Dict:
 
     # Actuated (Industry Standard)
     set_global_seed(seed)
-    generator_actuated = TrafficDataGenerator()
+    generator_actuated = _make_generator(num_intersections, seed)
     actuated_controller = ActuatedController()
     actuated_results = actuated_controller.run_simulation(
         generator_actuated.intersections, duration=1800
@@ -82,7 +104,7 @@ def run_single_experiment(seed: int, num_rounds: int = 50) -> Dict:
 
     # Local-ML
     set_global_seed(seed)
-    local_controller = LocalMLController(num_intersections=4)
+    local_controller = LocalMLController(num_intersections=num_intersections)
     local_results = local_controller.run_simulation(
         generator.intersections, generator, duration=1800
     )
@@ -92,10 +114,28 @@ def run_single_experiment(seed: int, num_rounds: int = 50) -> Dict:
         "mae": local_results["mae"]
     }
 
+    # Centralized-ML (privacy upper bound)
+    set_global_seed(seed)
+    centralized_controller = CentralizedMLController(
+        num_intersections=num_intersections,
+        hidden_layers=[256, 128, 64, 32],
+        epochs=25,
+        learning_rate=0.002,
+        weight_decay=5e-5,
+    )
+    centralized_results = centralized_controller.run_simulation(
+        generator.intersections, generator, duration=1800
+    )
+    results["centralized_ml"] = {
+        "wait_time": centralized_results["avg_waiting_time"],
+        "queue_length": centralized_results["avg_queue_length"],
+        "mae": centralized_results["mae"]
+    }
+
     # Federated Learning with FedProx
     set_global_seed(seed)
     fl_controller = AdaptiveFLController(
-        num_intersections=4,
+        num_intersections=num_intersections,
         num_rounds=num_rounds,
         local_epochs=15,
         hidden_layers=[256, 128, 64, 32],
@@ -119,24 +159,27 @@ def run_single_experiment(seed: int, num_rounds: int = 50) -> Dict:
     return results
 
 
-def run_multiple_experiments(num_runs: int = 5, num_rounds: int = 50) -> List[Dict]:
+def run_multiple_experiments(num_runs: int = 5, num_rounds: int = 50,
+                             num_intersections: int = 4) -> List[Dict]:
     """Run multiple experiments with different seeds."""
     seeds = [42, 123, 456, 789, 1024][:num_runs]
     all_results = []
 
     print(f"\n{'='*70}")
     print(f"  RUNNING {num_runs} EXPERIMENTS FOR STATISTICAL ANALYSIS")
+    print(f"  Intersections: {num_intersections}")
     print(f"{'='*70}\n")
 
     for i, seed in enumerate(seeds):
         print(f"\n--- Experiment {i+1}/{num_runs} (seed={seed}) ---")
-        result = run_single_experiment(seed, num_rounds)
+        result = run_single_experiment(seed, num_rounds, num_intersections)
         all_results.append(result)
 
-        print(f"  Fixed-Time: Wait={result['fixed_time']['wait_time']:.2f}s")
-        print(f"  Actuated:   Wait={result['actuated']['wait_time']:.2f}s")
-        print(f"  Local-ML:   Wait={result['local_ml']['wait_time']:.2f}s, MAE={result['local_ml']['mae']:.4f}")
-        print(f"  FL:         Wait={result['federated_learning']['wait_time']:.2f}s, MAE={result['federated_learning']['mae']:.4f}")
+        print(f"  Fixed-Time:    Wait={result['fixed_time']['wait_time']:.2f}s")
+        print(f"  Actuated:      Wait={result['actuated']['wait_time']:.2f}s")
+        print(f"  Local-ML:      Wait={result['local_ml']['wait_time']:.2f}s, MAE={result['local_ml']['mae']:.4f}")
+        print(f"  Centralized:   Wait={result['centralized_ml']['wait_time']:.2f}s, MAE={result['centralized_ml']['mae']:.4f}")
+        print(f"  FL (Ours):     Wait={result['federated_learning']['wait_time']:.2f}s, MAE={result['federated_learning']['mae']:.4f}")
 
     return all_results
 
@@ -145,7 +188,7 @@ def compute_statistics(results: List[Dict]) -> Dict:
     """Compute mean, std, and confidence intervals."""
     stats_dict = {}
 
-    for method in ["fixed_time", "actuated", "local_ml", "federated_learning"]:
+    for method in ["fixed_time", "actuated", "local_ml", "centralized_ml", "federated_learning"]:
         method_stats = {}
 
         # Wait time
@@ -168,7 +211,7 @@ def compute_statistics(results: List[Dict]) -> Dict:
         }
 
         # MAE (only for ML methods)
-        if method not in ["fixed_time", "actuated"]:
+        if method not in ["fixed_time", "actuated"] and all("mae" in r[method] for r in results):
             maes = [r[method]["mae"] for r in results]
             method_stats["mae"] = {
                 "mean": np.mean(maes),
@@ -198,8 +241,8 @@ def plot_method_comparison(stats: Dict, output_dir: Path):
     plt.style.use('seaborn-v0_8-whitegrid')
     fig, axes = plt.subplots(1, 3, figsize=(16, 5))
 
-    methods = ["Fixed-Time", "Actuated", "Local-ML", "FL (Ours)"]
-    colors = ['#95a5a6', '#2ecc71', '#3498db', '#e74c3c']  # Gray, Green, Blue, Red
+    methods = ["Fixed-Time", "Actuated", "Local-ML", "Centralized-ML", "FL (Ours)"]
+    colors = ['#95a5a6', '#2ecc71', '#3498db', '#f39c12', '#e74c3c']
 
     # Wait Time comparison
     ax1 = axes[0]
@@ -207,12 +250,14 @@ def plot_method_comparison(stats: Dict, output_dir: Path):
         stats["fixed_time"]["wait_time"]["mean"],
         stats["actuated"]["wait_time"]["mean"],
         stats["local_ml"]["wait_time"]["mean"],
+        stats["centralized_ml"]["wait_time"]["mean"],
         stats["federated_learning"]["wait_time"]["mean"]
     ]
     wait_stds = [
         stats["fixed_time"]["wait_time"]["std"],
         stats["actuated"]["wait_time"]["std"],
         stats["local_ml"]["wait_time"]["std"],
+        stats["centralized_ml"]["wait_time"]["std"],
         stats["federated_learning"]["wait_time"]["std"]
     ]
 
@@ -234,15 +279,17 @@ def plot_method_comparison(stats: Dict, output_dir: Path):
 
     ax1.tick_params(axis='x', rotation=15)
 
-    # MAE comparison (only ML methods)
+    # MAE comparison (ML methods only, including Centralized)
     ax2 = axes[1]
-    mae_methods = ["Local-ML", "FL (Ours)"]
-    mae_colors = ['#3498db', '#e74c3c']
+    mae_methods = ["Centralized-ML", "Local-ML", "FL (Ours)"]
+    mae_colors = ['#f39c12', '#3498db', '#e74c3c']
     mae_means = [
+        stats["centralized_ml"]["mae"]["mean"] if "mae" in stats["centralized_ml"] else 0,
         stats["local_ml"]["mae"]["mean"],
         stats["federated_learning"]["mae"]["mean"]
     ]
     mae_stds = [
+        stats["centralized_ml"]["mae"]["std"] if "mae" in stats["centralized_ml"] else 0,
         stats["local_ml"]["mae"]["std"],
         stats["federated_learning"]["mae"]["std"]
     ]
@@ -253,27 +300,29 @@ def plot_method_comparison(stats: Dict, output_dir: Path):
     ax2.set_title('(b) Prediction Accuracy', fontsize=14, fontweight='bold')
     ax2.set_ylim(0, max(mae_means) * 1.3)
 
-    # Highlight winner
-    if mae_means[1] < mae_means[0]:
-        bars2[1].set_edgecolor('#27ae60')
-        bars2[1].set_linewidth(3)
+    # Highlight winner (lowest MAE = best)
+    best_mae_idx = np.argmin(mae_means)
+    bars2[best_mae_idx].set_edgecolor('#27ae60')
+    bars2[best_mae_idx].set_linewidth(3)
 
     # Add value labels
     for bar, mean, std in zip(bars2, mae_means, mae_stds):
         ax2.text(bar.get_x() + bar.get_width()/2, bar.get_height() + std + 0.05,
                 f'{mean:.4f}', ha='center', va='bottom', fontsize=10, fontweight='bold')
 
-    # Add winner annotation
-    if mae_means[1] < mae_means[0]:
-        improvement = ((mae_means[0] - mae_means[1]) / mae_means[0]) * 100
-        ax2.annotate(f'FL wins by {improvement:.1f}%',
-                    xy=(1, mae_means[1]), xytext=(0.5, mae_means[0] * 0.85),
-                    fontsize=11, color='#e74c3c', fontweight='bold',
+    # Annotate: FL improvement over Local-ML
+    fl_mae    = mae_means[2]
+    local_mae = mae_means[1]
+    if fl_mae < local_mae:
+        improvement = ((local_mae - fl_mae) / local_mae) * 100
+        ax2.annotate(f'FL: +{improvement:.1f}% vs Local',
+                    xy=(2, fl_mae), xytext=(1.2, local_mae * 0.92),
+                    fontsize=10, color='#e74c3c', fontweight='bold',
                     arrowprops=dict(arrowstyle='->', color='#e74c3c'))
 
-    # Stability comparison (Std Dev) - NEW PANEL
+    # Stability comparison (Std Dev)
     ax3 = axes[2]
-    stability_methods = ["Fixed-Time", "Actuated", "Local-ML", "FL (Ours)"]
+    stability_methods = ["Fixed-Time", "Actuated", "Local-ML", "Centralized-ML", "FL (Ours)"]
     stability_stds = wait_stds  # Already computed above
     stability_colors = colors
 
@@ -425,7 +474,7 @@ def plot_network_stress_comparison(output_dir: Path):
     print(f"  Saved: ieee_network_stress.png/pdf")
 
 
-def run_ablation_study(output_dir: Path) -> Dict:
+def run_ablation_study(output_dir: Path, num_intersections: int = 4) -> Dict:
     """Run ablation study comparing different FL configurations."""
     print(f"\n{'='*70}")
     print("  ABLATION STUDY")
@@ -445,10 +494,10 @@ def run_ablation_study(output_dir: Path) -> Dict:
         print(f"\n--- Testing: {config['name']} ---")
         set_global_seed(seed)
 
-        generator = TrafficDataGenerator()
+        generator = _make_generator(num_intersections, seed)
 
         fl_controller = AdaptiveFLController(
-            num_intersections=4,
+            num_intersections=num_intersections,
             num_rounds=config.get("rounds", 50),
             local_epochs=config.get("epochs", 10),
             hidden_layers=config.get("hidden", [128, 64, 32]),
@@ -505,37 +554,45 @@ def run_ablation_study(output_dir: Path) -> Dict:
 
 
 def generate_latex_table(stats: Dict, ablation: Dict) -> str:
-    """Generate LaTeX table for IEEE paper with Stability column."""
+    """Generate LaTeX table for IEEE paper with Centralized-ML, Stability columns."""
     latex = """
 \\begin{table}[htbp]
 \\centering
-\\caption{Performance Comparison of Traffic Signal Control Methods}
+\\caption{Performance Comparison of Traffic Signal Control Methods (mean $\\pm$ std, 5 trials)}
 \\label{tab:results}
-\\begin{tabular}{lcccc}
+\\begin{tabular}{lcccl}
 \\toprule
-\\textbf{Method} & \\textbf{Wait Time (s)} & \\textbf{MAE} & \\textbf{Stability (Std)} & \\textbf{Notes} \\\\
+\\textbf{Method} & \\textbf{Wait Time (s)} & \\textbf{MAE} & \\textbf{Stability (Std)} & \\textbf{Privacy} \\\\
 \\midrule
 """
 
-    fixed_wait = stats["fixed_time"]["wait_time"]
+    fixed_wait    = stats["fixed_time"]["wait_time"]
     actuated_wait = stats["actuated"]["wait_time"]
-    local_wait = stats["local_ml"]["wait_time"]
-    local_mae = stats["local_ml"]["mae"]
-    fl_wait = stats["federated_learning"]["wait_time"]
-    fl_mae = stats["federated_learning"]["mae"]
+    local_wait    = stats["local_ml"]["wait_time"]
+    local_mae     = stats["local_ml"]["mae"]
+    central_wait  = stats["centralized_ml"]["wait_time"]
+    fl_wait       = stats["federated_learning"]["wait_time"]
+    fl_mae        = stats["federated_learning"]["mae"]
 
-    latex += f"Fixed-Time & {fixed_wait['mean']:.2f} $\\pm$ {fixed_wait['std']:.2f} & N/A & {fixed_wait['std']:.2f} & Baseline \\\\\n"
-    latex += f"Actuated & {actuated_wait['mean']:.2f} $\\pm$ {actuated_wait['std']:.2f} & N/A & {actuated_wait['std']:.2f} & Industry Standard \\\\\n"
-    latex += f"Local-ML & {local_wait['mean']:.2f} $\\pm$ {local_wait['std']:.2f} & {local_mae['mean']:.4f} $\\pm$ {local_mae['std']:.4f} & {local_wait['std']:.2f} & No Privacy \\\\\n"
+    # Centralized MAE (may not have been computed in older runs)
+    central_mae_str = "N/A"
+    if "mae" in stats["centralized_ml"]:
+        cm = stats["centralized_ml"]["mae"]
+        central_mae_str = f"{cm['mean']:.4f} $\\pm$ {cm['std']:.4f}"
 
-    mae_imp = ((local_mae['mean'] - fl_mae['mean']) / local_mae['mean']) * 100
-    stability_imp = ((local_wait['std'] - fl_wait['std']) / local_wait['std']) * 100
-    latex += f"\\textbf{{FL (Ours)}} & \\textbf{{{fl_wait['mean']:.2f} $\\pm$ {fl_wait['std']:.2f}}} & \\textbf{{{fl_mae['mean']:.4f} $\\pm$ {fl_mae['std']:.4f}}} & \\textbf{{{fl_wait['std']:.2f}}} & \\textbf{{+{mae_imp:.1f}\\% MAE}} \\\\\n"
+    mae_gap_local   = ((local_mae['mean']  - fl_mae['mean']) / local_mae['mean']) * 100
+    stability_imp   = ((local_wait['std']  - fl_wait['std']) / local_wait['std']) * 100
+
+    latex += f"Fixed-Time      & {fixed_wait['mean']:.2f} $\\pm$ {fixed_wait['std']:.2f} & N/A & {fixed_wait['std']:.2f} & -- \\\\\n"
+    latex += f"Actuated        & {actuated_wait['mean']:.2f} $\\pm$ {actuated_wait['std']:.2f} & N/A & {actuated_wait['std']:.2f} & -- \\\\\n"
+    latex += f"Local-ML        & {local_wait['mean']:.2f} $\\pm$ {local_wait['std']:.2f} & {local_mae['mean']:.4f} $\\pm$ {local_mae['std']:.4f} & {local_wait['std']:.2f} & None \\\\\n"
+    latex += f"Centralized-ML  & {central_wait['mean']:.2f} $\\pm$ {central_wait['std']:.2f} & {central_mae_str} & {central_wait['std']:.2f} & None (raw data pooled) \\\\\n"
+    latex += f"\\textbf{{FL (Ours)}} & \\textbf{{{fl_wait['mean']:.2f} $\\pm$ {fl_wait['std']:.2f}}} & \\textbf{{{fl_mae['mean']:.4f} $\\pm$ {fl_mae['std']:.4f}}} & \\textbf{{{fl_wait['std']:.2f}}} & \\textbf{{Data-local (GDPR)}} \\\\\n"
 
     latex += """\\bottomrule
 \\end{tabular}
 \\vspace{2mm}
-\\caption*{FL achieves """ + f"{mae_imp:.1f}" + """\\% better prediction accuracy and """ + f"{stability_imp:.0f}" + """\\% lower variance than Local-ML while preserving privacy.}
+\\caption*{ResilNet-FL achieves """ + f"{mae_gap_local:.1f}" + """\\% better MAE than Local-ML and """ + f"{stability_imp:.0f}" + """\\% lower variance, while closing the gap to Centralized-ML without sharing raw data.}
 \\end{table}
 """
     return latex
@@ -604,12 +661,13 @@ def run_generalization_test(fl_controller, local_controller, output_dir: Path) -
 
 def main():
     parser = argparse.ArgumentParser(description="IEEE-Ready Experiments")
-    parser.add_argument("--runs", type=int, default=5, help="Number of experiment runs")
-    parser.add_argument("--rounds", type=int, default=50, help="FL rounds per run")
-    parser.add_argument("--ablation", action="store_true", help="Run ablation study")
-    parser.add_argument("--output", type=str, default="results/ieee", help="Output directory")
-    parser.add_argument("--device", type=str, choices=["auto", "cpu", "cuda", "mps"],
-                       default="auto", help="Device to use (auto-detect by default)")
+    parser.add_argument("--runs",          type=int,   default=5,    help="Number of experiment runs")
+    parser.add_argument("--rounds",        type=int,   default=50,   help="FL rounds per run")
+    parser.add_argument("--intersections", type=int,   default=4,    help="Number of intersections (4 or 9)")
+    parser.add_argument("--ablation",      action="store_true",       help="Run ablation study")
+    parser.add_argument("--output",        type=str,   default="results/ieee", help="Output directory")
+    parser.add_argument("--device",        type=str,   choices=["auto", "cpu", "cuda", "mps"],
+                        default="auto",   help="Device to use (auto-detect by default)")
 
     args = parser.parse_args()
 
@@ -623,11 +681,12 @@ def main():
     print("\n" + "="*70)
     print("  IEEE-READY EXPERIMENTAL EVALUATION")
     print("  FL Traffic Signal Control with NS-3 Integration")
-    print(f"  Device: {DEVICE} ({'GPU' if is_gpu_available() else 'CPU'})")
+    print(f"  Device        : {DEVICE} ({'GPU' if is_gpu_available() else 'CPU'})")
+    print(f"  Intersections : {args.intersections}")
     print("="*70)
 
     # Run multiple experiments
-    results = run_multiple_experiments(args.runs, args.rounds)
+    results = run_multiple_experiments(args.runs, args.rounds, args.intersections)
 
     # Compute statistics
     print(f"\n{'='*70}")
@@ -637,14 +696,18 @@ def main():
     stats = compute_statistics(results)
 
     print("Method Comparison (mean ± std):")
-    print("-" * 80)
-    print(f"{'Method':<20} {'Wait Time':<20} {'MAE':<20} {'Stability':<15}")
-    print("-" * 80)
+    print("-" * 90)
+    print(f"{'Method':<22} {'Wait Time':<22} {'MAE':<22} {'Stability':<15}")
+    print("-" * 90)
 
-    print(f"{'Fixed-Time':<20} {stats['fixed_time']['wait_time']['mean']:.2f} ± {stats['fixed_time']['wait_time']['std']:.2f}s{'':<5} {'N/A':<20} {stats['fixed_time']['wait_time']['std']:.2f}s")
-    print(f"{'Actuated':<20} {stats['actuated']['wait_time']['mean']:.2f} ± {stats['actuated']['wait_time']['std']:.2f}s{'':<5} {'N/A':<20} {stats['actuated']['wait_time']['std']:.2f}s")
-    print(f"{'Local-ML':<20} {stats['local_ml']['wait_time']['mean']:.2f} ± {stats['local_ml']['wait_time']['std']:.2f}s{'':<5} {stats['local_ml']['mae']['mean']:.4f} ± {stats['local_ml']['mae']['std']:.4f}{'':<5} {stats['local_ml']['wait_time']['std']:.2f}s")
-    print(f"{'FL (Ours)':<20} {stats['federated_learning']['wait_time']['mean']:.2f} ± {stats['federated_learning']['wait_time']['std']:.2f}s{'':<5} {stats['federated_learning']['mae']['mean']:.4f} ± {stats['federated_learning']['mae']['std']:.4f}{'':<5} {stats['federated_learning']['wait_time']['std']:.2f}s")
+    print(f"{'Fixed-Time':<22} {stats['fixed_time']['wait_time']['mean']:.2f} ± {stats['fixed_time']['wait_time']['std']:.2f}s{'':<5} {'N/A':<22} {stats['fixed_time']['wait_time']['std']:.2f}s")
+    print(f"{'Actuated':<22} {stats['actuated']['wait_time']['mean']:.2f} ± {stats['actuated']['wait_time']['std']:.2f}s{'':<5} {'N/A':<22} {stats['actuated']['wait_time']['std']:.2f}s")
+    print(f"{'Local-ML':<22} {stats['local_ml']['wait_time']['mean']:.2f} ± {stats['local_ml']['wait_time']['std']:.2f}s{'':<5} {stats['local_ml']['mae']['mean']:.4f} ± {stats['local_ml']['mae']['std']:.4f}{'':<5} {stats['local_ml']['wait_time']['std']:.2f}s")
+    # Centralized-ML
+    cm_mae = stats['centralized_ml'].get('mae', {})
+    cm_mae_str = f"{cm_mae['mean']:.4f} ± {cm_mae['std']:.4f}" if cm_mae else "N/A"
+    print(f"{'Centralized-ML':<22} {stats['centralized_ml']['wait_time']['mean']:.2f} ± {stats['centralized_ml']['wait_time']['std']:.2f}s{'':<5} {cm_mae_str:<22} {stats['centralized_ml']['wait_time']['std']:.2f}s")
+    print(f"{'FL (Ours)':<22} {stats['federated_learning']['wait_time']['mean']:.2f} ± {stats['federated_learning']['wait_time']['std']:.2f}s{'':<5} {stats['federated_learning']['mae']['mean']:.4f} ± {stats['federated_learning']['mae']['std']:.4f}{'':<5} {stats['federated_learning']['wait_time']['std']:.2f}s")
 
     # Generate plots
     print(f"\n{'='*70}")
@@ -658,7 +721,7 @@ def main():
     # Ablation study
     ablation_results = {}
     if args.ablation:
-        ablation_results = run_ablation_study(output_dir)
+        ablation_results = run_ablation_study(output_dir, args.intersections)
 
     # Generate LaTeX table
     latex_table = generate_latex_table(stats, ablation_results)
@@ -695,10 +758,10 @@ def main():
         # Get trained controllers from last run
         last_seed = [42, 123, 456, 789, 1024][min(args.runs-1, 4)]
         set_global_seed(last_seed)
-        generator_gen = TrafficDataGenerator()
+        generator_gen = _make_generator(args.intersections, last_seed)
 
         fl_ctrl_gen = AdaptiveFLController(
-            num_intersections=4,
+            num_intersections=args.intersections,
             num_rounds=args.rounds,
             local_epochs=15,
             hidden_layers=[256, 128, 64, 32],
@@ -710,7 +773,7 @@ def main():
         )
         fl_ctrl_gen.train_federated(generator_gen.get_all_intersections_data())
 
-        local_ctrl_gen = LocalMLController(num_intersections=4)
+        local_ctrl_gen = LocalMLController(num_intersections=args.intersections)
         local_ctrl_gen.train_local_models(generator_gen.get_all_intersections_data())
 
         generalization_results = run_generalization_test(fl_ctrl_gen, local_ctrl_gen, output_dir)

@@ -23,33 +23,34 @@ GPU is auto-detected — no extra flags needed.
 
 ```
 TRAFFIC SIGNALS/
-├── run_ieee_experiments.py        # IEEE paper results (statistical, 5 runs)
-├── run_comprehensive.py           # Full experiment suite + dashboard
+├── run_ieee_experiments.py         # IEEE paper results (5 runs, Centralized-ML included)
+├── run_comprehensive.py            # Full experiment suite + dashboard
 ├── run_publication_experiments.py  # Extended publication suite (privacy, stats)
-├── run_simulation.py              # Basic traffic data generation
-├── run_demo.py                    # System walkthrough demo
-├── run_with_ns3.py                # FL + NS-3 network simulation
-├── run_cloudsim.py                # Edge/cloud computing simulation
-├── run_fl_server.py               # Distributed FL server (Flower)
-├── run_fl_client.py               # Distributed FL client (Flower)
-├── generate_radar_plot.py         # Radar trade-off chart for paper
-├── generate_architecture_diagram.py # System architecture diagram
-├── generate_comparison.py         # Before/after optimization plot
-├── generate_gen_plot.py           # Generalization bar chart
-├── config/config.yaml             # Main configuration file
-├── src/                           # Source code
-│   ├── baselines/                 #   Fixed-Time, Actuated, Local-ML, FL controllers
-│   ├── models/                    #   TrafficSignalModel, LSTM, GRU
-│   ├── traffic_generator/         #   Synthetic traffic (Poisson arrivals)
-│   ├── federated_learning/        #   Flower server/client, aggregation strategies
-│   ├── network_simulation/        #   Network layer abstraction
-│   ├── cloudsim_python/           #   Edge/cloud simulation
-│   ├── experiments/               #   Comprehensive, stress, scalability runners
-│   └── utils/                     #   Device, visualization, privacy, stats, config
-├── ns3_simulation/                # NS-3 bridge (Windows <-> WSL via ZeroMQ)
-├── paper/                         # LaTeX paper (ResilNet_FL_IEEE_Paper.tex)
-├── data/                          # Generated CSV data
-└── results/                       # All output plots, JSON, LaTeX tables
+├── run_byzantine_experiment.py     # Byzantine robustness evaluation (NEW)
+├── run_simulation.py               # Basic traffic data generation
+├── run_demo.py                     # System walkthrough demo
+├── run_with_ns3.py                 # FL + NS-3 network simulation
+├── run_cloudsim.py                 # Edge/cloud computing simulation
+├── run_fl_server.py                # Distributed FL server (Flower)
+├── run_fl_client.py                # Distributed FL client (Flower)
+├── generate_radar_plot.py          # Radar trade-off chart for paper
+├── generate_architecture_diagram.py# System architecture diagram
+├── generate_comparison.py          # Before/after optimization plot
+├── generate_gen_plot.py            # Generalization bar chart
+├── config/config.yaml              # Main configuration file
+├── src/                            # Source code
+│   ├── baselines/                  #   Fixed-Time, Actuated, Local-ML, Centralized-ML, FL
+│   ├── models/                     #   TrafficSignalModel, LSTM, GRU
+│   ├── traffic_generator/          #   Poisson simulator + SUMO integration (NEW)
+│   ├── federated_learning/         #   Aggregation (FedAvg, Krum, Median, Trimmed Mean)
+│   ├── network_simulation/         #   Network layer abstraction
+│   ├── cloudsim_python/            #   Edge/cloud simulation
+│   ├── experiments/                #   Comprehensive, stress, scalability runners
+│   └── utils/                      #   Device, visualization, privacy, stats, config
+├── ns3_simulation/                 # NS-3 bridge (Windows <-> WSL via ZeroMQ)
+├── paper/                          # LaTeX paper (ResilNet_FL_IEEE_Paper.tex)
+├── data/                           # Generated CSV data
+└── results/                        # All output plots, JSON, LaTeX tables
 ```
 
 ---
@@ -58,36 +59,39 @@ TRAFFIC SIGNALS/
 
 ### 1. IEEE Publication Experiments (Recommended First Run)
 
-Runs 5 independent trials (seeds 42, 123, 456, 789, 1024), computes mean/std/CI, generates publication plots, LaTeX table, and generalization test.
+Runs 5 independent trials with seeds 42, 123, 456, 789, 1024. Compares
+Fixed-Time, Actuated, Local-ML, **Centralized-ML (new)**, and FL.
+Generates publication plots, LaTeX table, and generalization test.
 
 ```bash
-# Full run — 5 trials, 50 FL rounds each (~15-20 min)
+# Full run — 4 intersections, 5 trials, 50 FL rounds each (~15-20 min)
 python run_ieee_experiments.py
 
-# Full run + ablation study (architecture comparison)
+# Full run with ablation study
 python run_ieee_experiments.py --runs 5 --rounds 50 --ablation
+
+# 9-intersection 3x3 grid (SUMO/enhanced-Poisson, ~30-40 min)
+python run_ieee_experiments.py --intersections 9 --rounds 50
 
 # Quick test — 1 trial, 20 rounds (~3 min)
 python run_ieee_experiments.py --runs 1 --rounds 20
 
 # Force CPU
 python run_ieee_experiments.py --device cpu
-
-# Custom output directory
-python run_ieee_experiments.py --output results/my_run
 ```
 
-| Flag | Default | Description |
-|------|---------|-------------|
-| `--runs N` | 5 | Number of independent trials |
-| `--rounds N` | 50 | FL rounds per trial |
-| `--ablation` | off | Run ablation study (FL-Small, FL-Medium, FL-Large, FL-NoScheduler) |
-| `--output DIR` | `results/ieee` | Output directory |
-| `--device` | `auto` | `auto`, `cpu`, `cuda`, or `mps` |
+| Flag              | Default       | Description                                         |
+|-------------------|---------------|-----------------------------------------------------|
+| `--runs N`        | 5             | Number of independent trials                        |
+| `--rounds N`      | 50            | FL rounds per trial                                 |
+| `--intersections N` | 4           | Number of intersections (4 or 9)                    |
+| `--ablation`      | off           | Run ablation study (architecture comparison)        |
+| `--output DIR`    | `results/ieee`| Output directory                                    |
+| `--device`        | `auto`        | `auto`, `cpu`, `cuda`, or `mps`                     |
 
 **Output** `results/ieee/`:
 ```
-ieee_method_comparison.png/pdf   — Bar chart: Fixed-Time vs Actuated vs Local-ML vs FL
+ieee_method_comparison.png/pdf   — Bar chart: 5-method comparison including Centralized-ML
 ieee_fl_convergence.png/pdf      — MAE convergence across FL rounds (all runs + mean)
 ieee_ablation_study.png/pdf      — Architecture comparison (with --ablation)
 ieee_network_stress.png/pdf      — MAE under network stress (if NS-3 data exists)
@@ -98,9 +102,52 @@ generalization_test.json         — FL vs Local-ML on unseen traffic (seed 9999
 
 ---
 
-### 2. Comprehensive Experiments
+### 2. Byzantine Robustness Experiment (NEW — Major Contribution)
 
-Baseline comparisons + network stress tests + scalability (2/4/6/8 clients) + summary dashboard.
+Evaluates FL aggregation strategies under sensor-noise attacks:
+sweeps Byzantine client count (0, 1, 2) across 5 strategies
+(FedAvg, Quality-Aware, Trimmed Mean, Median, Multi-Krum).
+
+```bash
+# Standard run — 9 intersections, 3 seeds, 40 rounds (~25 min)
+python run_byzantine_experiment.py
+
+# Quick mode — 4 intersections, 1 seed, 20 rounds (~5 min)
+python run_byzantine_experiment.py --quick
+
+# Custom
+python run_byzantine_experiment.py --intersections 9 --rounds 50 --seeds 5
+
+# Stronger attack
+python run_byzantine_experiment.py --noise-scale 100
+```
+
+| Flag               | Default              | Description                              |
+|--------------------|----------------------|------------------------------------------|
+| `--intersections N`| 9                    | Number of intersections                  |
+| `--rounds N`       | 40                   | FL rounds per condition                  |
+| `--noise-scale X`  | 50                   | Byzantine noise magnitude (×clean scale) |
+| `--seeds N`        | 3                    | Seeds per condition                      |
+| `--output DIR`     | `results/byzantine`  | Output directory                         |
+| `--quick`          | off                  | 4 intersections, 1 seed, 20 rounds       |
+
+**Output** `results/byzantine/`:
+```
+byzantine_robustness.png/pdf   — 2-panel figure: MAE vs Byzantine count + degradation %
+byzantine_table.tex            — LaTeX table for paper (paste into Section VIII)
+byzantine_results.json         — Full numeric results
+```
+
+**What to look for:**
+- FedAvg MAE spikes sharply at 1-2 Byzantine clients
+- Multi-Krum stays within ~3% of clean baseline
+- Paste `byzantine_table.tex` directly into the paper's Section VIII
+
+---
+
+### 3. Comprehensive Experiments
+
+Baseline comparisons + network stress tests + scalability (2/4/6/8/9 clients) + dashboard.
 
 ```bash
 # Full suite (~10-15 min)
@@ -113,11 +160,11 @@ python run_comprehensive.py --quick
 python run_comprehensive.py --seed 42 --device cuda
 ```
 
-| Flag | Default | Description |
-|------|---------|-------------|
-| `--quick` | off | Skip scalability tests |
-| `--seed N` | 42 | Random seed |
-| `--device` | `auto` | `auto`, `cpu`, `cuda`, or `mps` |
+| Flag      | Default | Description              |
+|-----------|---------|--------------------------|
+| `--quick` | off     | Skip scalability tests   |
+| `--seed N`| 42      | Random seed              |
+| `--device`| `auto`  | `auto`, `cpu`, `cuda`, `mps` |
 
 **Output** `results/comprehensive/`:
 ```
@@ -125,16 +172,17 @@ summary_dashboard.png      — All results in one image
 fl_convergence.png         — Training convergence curve
 method_comparison.png      — Baseline comparisons
 network_stress.png         — Latency/packet-loss resilience
-scalability.png            — 2-8 client scaling (full mode only)
+scalability.png            — 2-9 client scaling (full mode only)
 experiment_report.txt      — Text summary
 results.json               — All data
 ```
 
 ---
 
-### 3. Publication Experiments (Extended)
+### 4. Publication Experiments (Extended)
 
-Full paper-ready suite: statistical significance tests, privacy quantification, communication efficiency, live data robustness, network stress.
+Full paper-ready suite: statistical significance tests, privacy quantification,
+communication efficiency, live data robustness, network stress.
 
 ```bash
 # Full run — 5 trials, 100 rounds (~25-30 min)
@@ -147,11 +195,11 @@ python run_publication_experiments.py --quick
 python run_publication_experiments.py --runs 5 --rounds 100
 ```
 
-| Flag | Default | Description |
-|------|---------|-------------|
-| `--runs N` | 5 | Number of trials |
-| `--rounds N` | 100 | FL rounds per trial |
-| `--quick` | off | 3 runs, 50 rounds |
+| Flag      | Default | Description            |
+|-----------|---------|------------------------|
+| `--runs N`| 5       | Number of trials       |
+| `--rounds N`| 100   | FL rounds per trial    |
+| `--quick` | off     | 3 runs, 50 rounds      |
 
 **Output** `results/publication/`:
 ```
@@ -165,9 +213,9 @@ privacy_comparison.json     — Centralized vs FL privacy
 
 ---
 
-### 4. Basic Simulation
+### 5. Basic Simulation
 
-Generates traffic data and per-intersection statistics. Good for verifying the setup works.
+Generates traffic data and per-intersection statistics. Good for verifying the setup.
 
 ```bash
 python run_simulation.py
@@ -176,21 +224,19 @@ python run_simulation.py
 No CLI arguments. Uses `config/config.yaml`.
 
 **Output:**
-- `data/traffic_simulation.csv` — Raw traffic data (queue lengths, wait times, throughput)
+- `data/traffic_simulation.csv` — Raw traffic data
 - `results/traffic_metrics.png` — Traffic visualization
 - Console: per-intersection summary stats
 
 ---
 
-### 5. Demo Mode
+### 6. Demo Mode
 
 Step-by-step walkthrough: traffic generation, model training, evaluation, network simulation.
 
 ```bash
 python run_demo.py
 ```
-
-No CLI arguments. Uses `config/config.yaml`.
 
 **Output:**
 - `data/demo_simulation.csv` — Demo traffic data
@@ -200,18 +246,19 @@ No CLI arguments. Uses `config/config.yaml`.
 
 ## Network Simulation
 
-### 6. FL + NS-3 Integration
+### 7. FL + NS-3 Integration
 
-Runs FL training with realistic V2I (Vehicle-to-Infrastructure) network simulation using IEEE 802.11p/DSRC parameters.
+Runs FL training with realistic V2I (Vehicle-to-Infrastructure) network simulation
+using IEEE 802.11p/DSRC parameters.
 
 ```bash
-# With NS-3 (requires WSL bridge server running — see below)
+# With NS-3 (requires WSL bridge server — see below)
 python run_with_ns3.py
 
 # Specific network scenario
 python run_with_ns3.py --scenario degraded
 
-# Without NS-3 (uses built-in statistical simulator)
+# Without NS-3 (built-in statistical simulator)
 python run_with_ns3.py --no-ns3
 
 # Network stress test — runs all 5 scenarios sequentially
@@ -221,22 +268,22 @@ python run_with_ns3.py --stress-test
 python run_with_ns3.py --rounds 100 --scenario stressed
 ```
 
-| Flag | Default | Description |
-|------|---------|-------------|
-| `--no-ns3` | off | Skip NS-3, use built-in network sim |
-| `--scenario` | `normal` | `ideal`, `normal`, `degraded`, `stressed`, `extreme` |
-| `--rounds N` | 50 | FL training rounds |
-| `--stress-test` | off | Run all 5 scenarios |
+| Flag          | Default    | Description                          |
+|---------------|------------|--------------------------------------|
+| `--no-ns3`    | off        | Skip NS-3, use built-in network sim  |
+| `--scenario`  | `normal`   | See table below                      |
+| `--rounds N`  | 50         | FL training rounds                   |
+| `--stress-test`| off       | Run all 5 scenarios                  |
 
 **Network scenarios:**
 
-| Scenario | Latency | Jitter | Packet Loss | Bandwidth |
-|----------|---------|--------|-------------|-----------|
-| `ideal` | 5 ms | +/- 2 ms | 0% | 54 Mbps |
-| `normal` | 15 ms | +/- 5 ms | 1% | 27 Mbps |
-| `degraded` | 50 ms | +/- 15 ms | 5% | 12 Mbps |
-| `stressed` | 100 ms | +/- 30 ms | 10% | 6 Mbps |
-| `extreme` | 200 ms | +/- 50 ms | 20% | 3 Mbps |
+| Scenario    | Latency   | Jitter     | Loss | Bandwidth | Technology |
+|-------------|-----------|------------|------|-----------|------------|
+| `ideal`     | 5 ms      | ±2 ms      | 0%   | 54 Mbps   | 5G NR V2X  |
+| `normal`    | 15 ms     | ±5 ms      | 1%   | 27 Mbps   | Hybrid     |
+| `degraded`  | 50 ms     | ±15 ms     | 5%   | 12 Mbps   | LTE-V2X    |
+| `stressed`  | 100 ms    | ±30 ms     | 10%  | 6 Mbps    | DSRC       |
+| `extreme`   | 200 ms    | ±50 ms     | 20%  | 3 Mbps    | DSRC (congested) |
 
 **NS-3 bridge setup (one-time):**
 ```bash
@@ -264,9 +311,9 @@ stress_test_summary.json     — Summary across all scenarios
 
 ---
 
-### 7. CloudSim Edge Computing
+### 8. CloudSim Edge Computing
 
-Simulates edge/cloud offloading: VMs, edge servers, cloudlets, task scheduling for FL aggregation.
+Simulates edge/cloud offloading for FL aggregation.
 
 ```bash
 python run_cloudsim.py
@@ -278,41 +325,49 @@ No CLI arguments. Output: console analysis.
 
 ## Distributed FL (Flower Framework)
 
-### 8. FL Server + Clients (Multi-Terminal)
-
-Run actual distributed federated learning with separate server and client processes.
+### 9. FL Server + Clients (Multi-Terminal)
 
 **Terminal 1 — Start server:**
 ```bash
 python run_fl_server.py --rounds 50 --min-clients 4
 ```
 
-| Flag | Default | Description |
-|------|---------|-------------|
-| `--address` | `0.0.0.0:8080` | Server bind address |
-| `--rounds N` | 10 | Number of FL rounds |
-| `--min-clients N` | 2 | Minimum clients before training starts |
-| `--config PATH` | `config/config.yaml` | Config file |
+| Flag           | Default        | Description                    |
+|----------------|----------------|--------------------------------|
+| `--address`    | `0.0.0.0:8080` | Server bind address            |
+| `--rounds N`   | 10             | Number of FL rounds            |
+| `--min-clients N` | 2           | Min clients before training    |
+| `--config PATH`| `config/config.yaml` | Config file              |
 
-**Terminals 2-5 — Start clients (one per intersection):**
+**Terminals 2-N — Start clients (one per intersection):**
 ```bash
 python run_fl_client.py --server localhost:8080 --intersection 0
 python run_fl_client.py --server localhost:8080 --intersection 1
-python run_fl_client.py --server localhost:8080 --intersection 2
-python run_fl_client.py --server localhost:8080 --intersection 3
+# ... up to --intersection 8 for 9-node grid
 ```
-
-| Flag | Default | Description |
-|------|---------|-------------|
-| `--server` | `localhost:8080` | Server address |
-| `--intersection N` | 0 | Intersection ID (0-3) |
-| `--config PATH` | `config/config.yaml` | Config file |
 
 ---
 
-## Plot Generators (for Paper Figures)
+## SUMO Integration
 
-These scripts generate standalone figures from existing results or hardcoded data.
+The 3×3 grid environment auto-detects SUMO. Without SUMO installed,
+it falls back transparently to the enhanced Poisson simulator.
+
+```bash
+# Test the SUMO integration module directly
+python src/traffic_generator/sumo_integration.py
+
+# With SUMO installed (set SUMO_HOME first)
+set SUMO_HOME=C:\Program Files (x86)\Eclipse\Sumo
+python src/traffic_generator/sumo_integration.py
+```
+
+**Output:** feature vectors for all 9 intersections, mean wait times,
+training data shapes. Confirms SUMO/fallback mode.
+
+---
+
+## Plot Generators (Paper Figures)
 
 ```bash
 # Radar chart — multi-objective trade-off comparison
@@ -345,14 +400,17 @@ python src/utils/device.py
 # Traffic model — creates model, trains, evaluates on dummy data
 python src/models/traffic_model.py
 
-# Byzantine-robust aggregation — tests FedAvg, Krum, TrimmedMean, Median
+# Byzantine-robust aggregation — FedAvg, Krum, TrimmedMean, Median
 python src/federated_learning/aggregation.py
 
-# Trace-driven network simulation — IEEE 802.11p, LTE-V2X, 5G-V2X params
-python ns3_simulation/network_traces.py
+# SUMO 3x3 grid environment — 9 intersections, training data shapes
+python src/traffic_generator/sumo_integration.py
 
-# NS-3 bridge client — connection test (needs server running)
-python ns3_simulation/ns3_bridge_client.py
+# Centralized-ML controller — trains on pooled data (4 intersections, 5 min)
+python src/baselines/centralized_ml.py
+
+# Trace-driven network simulation — IEEE 802.11p, LTE-V2X, 5G-V2X
+python ns3_simulation/network_traces.py
 
 # Visualization functions — generates test plots
 python src/utils/visualization.py
@@ -382,7 +440,8 @@ python run_simulation.py
 python src/utils/device.py
 ```
 
-Note: `--device` flag is available in `run_ieee_experiments.py` and `run_comprehensive.py`. For other scripts, use the `RESILNET_DEVICE` environment variable.
+Note: `--device` flag is available in `run_ieee_experiments.py` and `run_comprehensive.py`.
+For other scripts, use the `RESILNET_DEVICE` environment variable.
 
 ---
 
@@ -390,67 +449,95 @@ Note: `--device` flag is available in `run_ieee_experiments.py` and `run_compreh
 
 All settings are in `config/config.yaml`:
 
-| Section | Key Settings |
-|---------|-------------|
-| **traffic** | `num_intersections: 4`, `simulation_duration: 3600`, `arrival_distribution: poisson` |
+| Section              | Key Settings                                                      |
+|----------------------|-------------------------------------------------------------------|
+| **traffic**          | `num_intersections: 4` (or 9), `simulation_duration: 3600`, `arrival_distribution: poisson` |
 | **federated_learning** | `num_rounds: 100`, `local_epochs: 10`, `learning_rate: 0.001`, `patience: 15` |
-| **model** | `hidden_layers: [128, 64, 32]`, `use_batch_norm: true`, `dropout_rate: 0.1` |
-| **network** | `base_latency: 10ms`, `bandwidth: 100 Mbps`, `packet_loss: 0.01` |
-| **cloudsim** | `edge_vm_mips: 1000`, `cloud_host_mips: 10000` |
+| **model**            | `hidden_layers: [128, 64, 32]`, `use_batch_norm: true`, `dropout_rate: 0.1` |
+| **network**          | `base_latency: 10ms`, `bandwidth: 100 Mbps`, `packet_loss: 0.01` |
+| **cloudsim**         | `edge_vm_mips: 1000`, `cloud_host_mips: 10000`                   |
 
-Note: The CLI experiment runners (`run_ieee_experiments.py`, `run_comprehensive.py`) override some of these with optimized values (e.g., `[256,128,64,32]` architecture, FedProx mu=0.05).
+Note: CLI experiment runners (`run_ieee_experiments.py`, `run_byzantine_experiment.py`)
+override some of these with optimised values (e.g., `[256,128,64,32]` architecture, FedProx mu=0.05).
 
 ---
 
 ## Quick Reference
 
-| Command | What it does | Time | Output Directory |
-|---------|-------------|------|-----------------|
-| `python run_ieee_experiments.py` | Full IEEE paper results (5 runs) | ~15-20 min | `results/ieee/` |
-| `python run_ieee_experiments.py --runs 1 --rounds 20` | Quick single run | ~3 min | `results/ieee/` |
-| `python run_ieee_experiments.py --ablation` | + ablation study | ~25 min | `results/ieee/` |
-| `python run_comprehensive.py` | All experiments + dashboard | ~10-15 min | `results/comprehensive/` |
-| `python run_comprehensive.py --quick` | Skip scalability | ~5 min | `results/comprehensive/` |
-| `python run_publication_experiments.py` | Extended publication suite | ~25-30 min | `results/publication/` |
-| `python run_publication_experiments.py --quick` | Quick publication suite | ~10 min | `results/publication/` |
-| `python run_simulation.py` | Basic traffic simulation | ~2 min | `data/` + `results/` |
-| `python run_demo.py` | System demo walkthrough | ~2 min | `data/` + console |
-| `python run_with_ns3.py` | FL + NS-3 network sim | ~10 min | `results/ns3_integrated/` |
-| `python run_with_ns3.py --stress-test` | All 5 network scenarios | ~30 min | `results/ns3_stress/` |
-| `python run_with_ns3.py --no-ns3` | FL + built-in network sim | ~10 min | `results/ns3_integrated/` |
-| `python run_cloudsim.py` | Edge/cloud simulation | ~2 min | console |
-| `python run_fl_server.py` | Start FL server | blocks | — |
-| `python run_fl_client.py --intersection 0` | Start FL client | blocks | — |
-| `python generate_radar_plot.py` | Radar chart for paper | ~5 sec | `results/ieee/` |
-| `python generate_architecture_diagram.py` | Architecture diagram | ~5 sec | `results/ieee/` |
-| `python generate_comparison.py` | Before/after comparison | ~5 sec | `results/comprehensive/` |
-| `python generate_gen_plot.py` | Generalization plot | ~5 sec | `results/ieee/` |
-| `python src/utils/device.py` | Verify GPU detection | ~1 sec | console |
-| `python src/models/traffic_model.py` | Test model training | ~5 sec | console |
-| `python src/federated_learning/aggregation.py` | Test aggregation | ~2 sec | console |
+| Command                                                           | What it does                                  | Time        | Output Dir            |
+|-------------------------------------------------------------------|-----------------------------------------------|-------------|------------------------|
+| `python run_ieee_experiments.py`                                  | Full IEEE results, 5 runs, + Centralized-ML   | ~15-20 min  | `results/ieee/`        |
+| `python run_ieee_experiments.py --intersections 9`                | 9-intersection 3x3 grid (SUMO)               | ~30-40 min  | `results/ieee/`        |
+| `python run_ieee_experiments.py --runs 1 --rounds 20`             | Quick single run                              | ~3 min      | `results/ieee/`        |
+| `python run_ieee_experiments.py --ablation`                       | + ablation study                              | ~25 min     | `results/ieee/`        |
+| `python run_byzantine_experiment.py`                              | Byzantine robustness (5 strategies)           | ~25 min     | `results/byzantine/`   |
+| `python run_byzantine_experiment.py --quick`                      | Byzantine quick mode                          | ~5 min      | `results/byzantine/`   |
+| `python run_comprehensive.py`                                     | All experiments + dashboard                   | ~10-15 min  | `results/comprehensive/`|
+| `python run_comprehensive.py --quick`                             | Skip scalability                              | ~5 min      | `results/comprehensive/`|
+| `python run_publication_experiments.py`                           | Extended publication suite                    | ~25-30 min  | `results/publication/` |
+| `python run_publication_experiments.py --quick`                   | Quick publication suite                       | ~10 min     | `results/publication/` |
+| `python run_simulation.py`                                        | Basic traffic simulation                      | ~2 min      | `data/` + `results/`   |
+| `python run_demo.py`                                              | System demo walkthrough                       | ~2 min      | `data/` + console      |
+| `python run_with_ns3.py`                                          | FL + NS-3 network sim                         | ~10 min     | `results/ns3_integrated/`|
+| `python run_with_ns3.py --stress-test`                            | All 5 network scenarios                       | ~30 min     | `results/ns3_stress/`  |
+| `python run_with_ns3.py --no-ns3`                                 | FL + built-in network sim                     | ~10 min     | `results/ns3_integrated/`|
+| `python run_cloudsim.py`                                          | Edge/cloud simulation                         | ~2 min      | console                |
+| `python run_fl_server.py`                                         | Start FL server                               | blocks      | —                      |
+| `python run_fl_client.py --intersection 0`                        | Start FL client                               | blocks      | —                      |
+| `python generate_radar_plot.py`                                   | Radar chart for paper                         | ~5 sec      | `results/ieee/`        |
+| `python generate_architecture_diagram.py`                         | Architecture diagram                          | ~5 sec      | `results/ieee/`        |
+| `python generate_comparison.py`                                   | Before/after comparison                       | ~5 sec      | `results/comprehensive/`|
+| `python generate_gen_plot.py`                                     | Generalization plot                           | ~5 sec      | `results/ieee/`        |
+| `python src/utils/device.py`                                      | Verify GPU detection                          | ~1 sec      | console                |
+| `python src/models/traffic_model.py`                              | Test model training                           | ~5 sec      | console                |
+| `python src/federated_learning/aggregation.py`                    | Test Byzantine aggregation                    | ~2 sec      | console                |
+| `python src/traffic_generator/sumo_integration.py`                | Test SUMO 3x3 grid                            | ~3 sec      | console                |
+| `python src/baselines/centralized_ml.py`                          | Test Centralized-ML                           | ~30 sec     | console                |
 
 ---
 
-## Suggested Run Order
+## Suggested Run Order for Paper Reproducibility
 
 ```bash
 # Step 1: Verify setup
 python src/utils/device.py
+python src/traffic_generator/sumo_integration.py
 
-# Step 2: Quick test (3 min)
+# Step 2: Quick sanity check (3 min)
 python run_ieee_experiments.py --runs 1 --rounds 20
 
-# Step 3: Full IEEE results (15-20 min)
+# Step 3: Full IEEE results with Centralized-ML (15-20 min)
 python run_ieee_experiments.py --runs 5 --rounds 50 --ablation
 
-# Step 4: Generate paper figures
+# Step 4: Byzantine robustness (major new contribution, 25 min)
+python run_byzantine_experiment.py
+
+# Step 5: 9-intersection SUMO grid results (30-40 min)
+python run_ieee_experiments.py --intersections 9 --runs 5 --rounds 50
+
+# Step 6: Generate paper figures
 python generate_radar_plot.py
 python generate_architecture_diagram.py
 python generate_gen_plot.py
 
-# Step 5: Network resilience (optional, needs NS-3 or --no-ns3)
+# Step 7: Network resilience (optional, needs NS-3 or --no-ns3)
 python run_with_ns3.py --stress-test --no-ns3
 
-# Step 6: Extended publication suite (optional)
+# Step 8: Extended publication suite (optional)
 python run_publication_experiments.py --quick
 ```
+
+---
+
+## LaTeX Integration
+
+After running experiments, copy these generated files directly into the paper:
+
+| File                                       | Paper Section        |
+|--------------------------------------------|----------------------|
+| `results/ieee/latex_table.tex`             | Section VII Table    |
+| `results/byzantine/byzantine_table.tex`    | Section VIII Table   |
+| `results/ieee/ieee_method_comparison.png`  | Section VII Figure   |
+| `results/ieee/ieee_fl_convergence.png`     | Section VII Figure   |
+| `results/byzantine/byzantine_robustness.png` | Section VIII Figure |
+| `results/ieee/ieee_tradeoff_radar.png`     | Section IX Figure    |

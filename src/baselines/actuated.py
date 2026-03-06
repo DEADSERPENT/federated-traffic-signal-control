@@ -38,8 +38,9 @@ class ActuatedController:
 
     def __init__(self, config: ActuatedConfig = None):
         self.config = config or ActuatedConfig()
-        self.phase_timers = {}  # Track green time per intersection
-        self.gap_timers = {}    # Track time since last vehicle
+        self.phase_timers = {}    # Seconds elapsed in the CURRENT phase
+        self.previous_phases = {}  # Last known phase encoding per intersection
+        self.gap_timers = {}       # Track time since last vehicle
         self.metrics_history = []
 
     def get_green_duration(
@@ -133,6 +134,7 @@ class ActuatedController:
         for intersection in intersections:
             intersection.reset()
             self.phase_timers[intersection.intersection_id] = 0
+            self.previous_phases[intersection.intersection_id] = 1.0  # NS phase initially
 
         # Metrics tracking
         total_waiting_time = 0
@@ -161,7 +163,12 @@ class ActuatedController:
                 # Step simulation
                 metrics = intersection.step(time_step, "poisson")
 
-                # Update phase timer
+                # Reset phase timer when phase changes, then accumulate
+                current_phase_enc = features[4]
+                prev_phase = self.previous_phases.get(intersection.intersection_id, current_phase_enc)
+                if current_phase_enc != prev_phase:
+                    self.phase_timers[intersection.intersection_id] = 0
+                self.previous_phases[intersection.intersection_id] = current_phase_enc
                 self.phase_timers[intersection.intersection_id] += time_step
 
                 step_waiting += metrics["average_waiting_time"]

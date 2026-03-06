@@ -1,0 +1,237 @@
+# ==============================================================================
+# ResilNet-FL: Traffic Signal Control — Docker Compose
+# ==============================================================================
+# Run from the PROJECT ROOT (not from docker/):
+#
+#   docker compose -f docker/docker-compose.yml up demo
+#   docker compose -f docker/docker-compose.yml up ieee
+#   docker compose -f docker/docker-compose.yml up byzantine
+#   docker compose -f docker/docker-compose.yml up fl-server fl-client-0 ...
+#
+# Or use the helper scripts (they cd to project root automatically):
+#   docker/docker-run.sh  demo | ieee | byzantine | fl | simulation | build
+#   docker\docker-run.bat demo | ieee | byzantine | fl | simulation | build
+# ==============================================================================
+
+# NOTE: build.context is ".." so paths below are relative to docker/ → project root
+x-base: &base
+  build:
+    context: ..
+    dockerfile: docker/Dockerfile
+  environment:
+    - PYTHONPATH=/app/src
+    - EXPERIMENT_SEED=42
+  networks:
+    - fl-network
+
+services:
+
+  # ============================================================================
+  # DEMO — quick comprehensive run (~5 min)
+  # ============================================================================
+  demo:
+    <<: *base
+    container_name: traffic-fl-demo
+    volumes:
+      - ../results:/app/results
+      - ../data:/app/data
+    command: python main.py --mode comprehensive
+
+  # ============================================================================
+  # IEEE EXPERIMENTS — full publication-grade run
+  # ============================================================================
+  ieee:
+    <<: *base
+    container_name: traffic-fl-ieee
+    volumes:
+      - ../results:/app/results
+      - ../data:/app/data
+    command: python main.py --mode ieee --intersections 9 --trials 5
+
+  # ============================================================================
+  # BYZANTINE ROBUSTNESS TEST
+  # ============================================================================
+  byzantine:
+    <<: *base
+    container_name: traffic-fl-byzantine
+    volumes:
+      - ../results:/app/results
+      - ../data:/app/data
+    command: python main.py --mode byzantine
+
+  # ============================================================================
+  # TRAFFIC SIMULATION ONLY
+  # ============================================================================
+  simulation:
+    <<: *base
+    container_name: traffic-simulation
+    volumes:
+      - ../results:/app/results
+      - ../data:/app/data
+    command: python main.py --mode simulation
+
+  # ============================================================================
+  # CLOUDSIM EDGE-COMPUTING SIMULATION
+  # ============================================================================
+  cloudsim:
+    <<: *base
+    container_name: traffic-cloudsim
+    volumes:
+      - ../results:/app/results
+    command: python main.py --mode cloudsim
+
+  # ============================================================================
+  # FEDERATED LEARNING SERVER
+  # ============================================================================
+  fl-server:
+    <<: *base
+    container_name: fl-server
+    ports:
+      - "8080:8080"
+    environment:
+      - PYTHONPATH=/app/src
+      - FL_SERVER_ADDRESS=0.0.0.0:8080
+    command: python scripts/run_fl_server.py --address 0.0.0.0:8080 --rounds 20 --min-clients 4
+    healthcheck:
+      test: ["CMD", "python", "-c",
+             "import socket; s=socket.socket(); s.connect(('localhost',8080)); s.close()"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ============================================================================
+  # FEDERATED LEARNING CLIENTS — 9-intersection grid (clients 0-8)
+  # ============================================================================
+  fl-client-0:
+    <<: *base
+    container_name: fl-client-0
+    environment:
+      - PYTHONPATH=/app/src
+      - FL_SERVER_ADDRESS=fl-server:8080
+      - INTERSECTION_ID=0
+    command: python scripts/run_fl_client.py --server fl-server:8080 --intersection 0
+    depends_on:
+      fl-server:
+        condition: service_healthy
+    restart: on-failure
+
+  fl-client-1:
+    <<: *base
+    container_name: fl-client-1
+    environment:
+      - PYTHONPATH=/app/src
+      - FL_SERVER_ADDRESS=fl-server:8080
+      - INTERSECTION_ID=1
+    command: python scripts/run_fl_client.py --server fl-server:8080 --intersection 1
+    depends_on:
+      fl-server:
+        condition: service_healthy
+    restart: on-failure
+
+  fl-client-2:
+    <<: *base
+    container_name: fl-client-2
+    environment:
+      - PYTHONPATH=/app/src
+      - FL_SERVER_ADDRESS=fl-server:8080
+      - INTERSECTION_ID=2
+    command: python scripts/run_fl_client.py --server fl-server:8080 --intersection 2
+    depends_on:
+      fl-server:
+        condition: service_healthy
+    restart: on-failure
+
+  fl-client-3:
+    <<: *base
+    container_name: fl-client-3
+    environment:
+      - PYTHONPATH=/app/src
+      - FL_SERVER_ADDRESS=fl-server:8080
+      - INTERSECTION_ID=3
+    command: python scripts/run_fl_client.py --server fl-server:8080 --intersection 3
+    depends_on:
+      fl-server:
+        condition: service_healthy
+    restart: on-failure
+
+  fl-client-4:
+    <<: *base
+    container_name: fl-client-4
+    environment:
+      - PYTHONPATH=/app/src
+      - FL_SERVER_ADDRESS=fl-server:8080
+      - INTERSECTION_ID=4
+    command: python scripts/run_fl_client.py --server fl-server:8080 --intersection 4
+    depends_on:
+      fl-server:
+        condition: service_healthy
+    restart: on-failure
+
+  fl-client-5:
+    <<: *base
+    container_name: fl-client-5
+    environment:
+      - PYTHONPATH=/app/src
+      - FL_SERVER_ADDRESS=fl-server:8080
+      - INTERSECTION_ID=5
+    command: python scripts/run_fl_client.py --server fl-server:8080 --intersection 5
+    depends_on:
+      fl-server:
+        condition: service_healthy
+    restart: on-failure
+
+  fl-client-6:
+    <<: *base
+    container_name: fl-client-6
+    environment:
+      - PYTHONPATH=/app/src
+      - FL_SERVER_ADDRESS=fl-server:8080
+      - INTERSECTION_ID=6
+    command: python scripts/run_fl_client.py --server fl-server:8080 --intersection 6
+    depends_on:
+      fl-server:
+        condition: service_healthy
+    restart: on-failure
+
+  fl-client-7:
+    <<: *base
+    container_name: fl-client-7
+    environment:
+      - PYTHONPATH=/app/src
+      - FL_SERVER_ADDRESS=fl-server:8080
+      - INTERSECTION_ID=7
+    command: python scripts/run_fl_client.py --server fl-server:8080 --intersection 7
+    depends_on:
+      fl-server:
+        condition: service_healthy
+    restart: on-failure
+
+  fl-client-8:
+    <<: *base
+    container_name: fl-client-8
+    environment:
+      - PYTHONPATH=/app/src
+      - FL_SERVER_ADDRESS=fl-server:8080
+      - INTERSECTION_ID=8
+    command: python scripts/run_fl_client.py --server fl-server:8080 --intersection 8
+    depends_on:
+      fl-server:
+        condition: service_healthy
+    restart: on-failure
+
+# ==============================================================================
+# NETWORK
+# ==============================================================================
+networks:
+  fl-network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.28.0.0/16
+
+# ==============================================================================
+# VOLUMES (for persistent data between container restarts)
+# ==============================================================================
+volumes:
+  results-data:
+  simulation-data:

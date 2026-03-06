@@ -8,7 +8,8 @@ import os
 import numpy as np
 
 # Add src to path
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'src'))
+PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, os.path.join(PROJECT_ROOT, 'src'))
 
 from traffic_generator import TrafficDataGenerator
 from models.traffic_model import create_model, train_model, evaluate_model
@@ -24,7 +25,7 @@ def run_demo():
     print("=" * 70)
 
     # Load configuration
-    config = load_config("config/config.yaml")
+    config = load_config(os.path.join(PROJECT_ROOT, "config", "config.yaml"))
     print("\n[1/6] Configuration loaded successfully")
 
     # Step 1: Initialize traffic simulation

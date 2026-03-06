@@ -533,11 +533,12 @@ python run_publication_experiments.py --quick
 
 After running experiments, copy these generated files directly into the paper:
 
-| File                                       | Paper Section        |
-|--------------------------------------------|----------------------|
-| `results/ieee/latex_table.tex`             | Section VII Table    |
-| `results/byzantine/byzantine_table.tex`    | Section VIII Table   |
-| `results/ieee/ieee_method_comparison.png`  | Section VII Figure   |
-| `results/ieee/ieee_fl_convergence.png`     | Section VII Figure   |
-| `results/byzantine/byzantine_robustness.png` | Section VIII Figure |
-| `results/ieee/ieee_tradeoff_radar.png`     | Section IX Figure    |
+| File                                        |  Paper Section       |
+|---------------------------------------------|----------------------|
+| `results/ieee/latex_table.tex`              | Section VII Table    |
+| `results/byzantine/byzantine_table.tex`     | Section VIII Table   |
+| `results/ieee/ieee_method_comparison.png`   | Section VII Figure   |
+| `results/ieee/ieee_fl_convergence.png`      | Section VII Figure   |
+| `results/byzantine/byzantine_robustness.png`| Section VIII Figure  |
+| `results/ieee/ieee_tradeoff_radar.png`      | Section IX Figure    |
+|---------------------------------------------|----------------------|

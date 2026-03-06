@@ -1,0 +1,749 @@
+================================================================================
+RESILNET-FL  —  CODE QUALITY AUDIT REPORT
+Generated: 2026-03-06
+Scope: All 35 source files across src/, scripts/, tools/, main.py
+================================================================================
+
+SCORING SCALE
+  10 — Production-grade, no issues
+   8 — Good, minor issues only
+   6 — Functional, notable issues
+   4 — Works but significant problems
+   2 — Broken or unusable
+
+================================================================================
+SECTION 1  —  FILE-BY-FILE QUALITY SCORES
+================================================================================
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│  LAYER 1: DATA / SIMULATION                                                 │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+FILE: src/traffic_generator/intersection.py                         SCORE: 8/10
+  Purpose : Models a single 4-way intersection (4 lanes, 2-phase signal).
+  Strengths:
+    - Clean dataclass design (Lane, Intersection, SignalPhase enum).
+    - Poisson and uniform arrival distributions supported.
+    - Phase-state machine correct (GREEN → YELLOW → phase-switch).
+    - get_feature_vector() returns consistent 6-dim array used everywhere.
+  Issues:
+    - Lane.remove_vehicles() calls list.pop(0) — O(n) per vehicle.
+      With queue_length up to 50 and 4 lanes × N intersections × T steps,
+      this is fine now but will degrade with larger simulations.
+      Fix: use collections.deque.
+    - Actuated controller bug dependency: phase_timer is NEVER reset when
+      phase switches (line 261 "self.phase_timer = 0"), but ActuatedController
+      line 165 keeps incrementing it externally without reset — the
+      "current_green_time" parameter to get_green_duration() is therefore
+      always the cumulative run time, not the current green phase duration.
+  Interlinking: Used by generator.py, all baselines, and scripts.
+
+FILE: src/traffic_generator/generator.py                            SCORE: 7/10
+  Purpose : Generates synthetic (X, y) training data via intersection simulation.
+  Strengths:
+    - Config-driven (YAML or dict or defaults).
+    - get_all_intersections_data() supports FL client data splitting.
+    - Non-IID achieved naturally: each intersection gets a random arrival_rate.
+  Issues:
+    - _calculate_optimal_green() is the ground-truth label generator.
+      It is a HAND-CRAFTED heuristic (not from real data or a known optimal
+      policy). This is the training target for the entire FL system — its
+      quality directly bounds model performance. There is no validation that
+      these labels minimize real waiting time.
+    - get_intersection_data() is called at train time AND test time (local_ml.py
+      line 219): test data is freshly generated, not a held-out split.
+      This means evaluation MAE may be overly optimistic (test labels come
+      from the same stochastic process with same seed state — not truly held-out).
+    - arrival_rate sampled with np.random.uniform at init — not seeded by
+      intersection_id, so different runs get different data distributions
+      unless set_global_seed() is called first (not guaranteed call order).
+  Interlinking: Used by local_ml.py, adaptive_fl.py, centralized_ml.py,
+                run_ieee.py, run_byzantine.py.
+
+FILE: src/traffic_generator/sumo_integration.py                     SCORE: 9/10
+  Purpose : SUMO 3x3 grid + enhanced Poisson fallback (9 intersections).
+  Strengths:
+    - Excellent dual-mode design: SUMOEnvironment and SUMOFallbackEnvironment
+      share the same API — rest of codebase is agnostic to which runs.
+    - Webster's formula (_optimal_green) is a real traffic engineering standard.
+    - Non-IID heterogeneity: corner (8 veh/min), edge (14), CBD (22) — justified
+      by traffic engineering literature.
+    - Time-of-day multipliers model morning/evening rush realistically.
+    - Spillover between intersections (5% of upstream queue) adds realism.
+    - Self-test in __main__ is comprehensive.
+  Issues:
+    - Route file (grid3x3.rou.xml) generates <vehicle> elements WITHOUT <route>
+      edges. SUMO requires each vehicle to specify a route (sequence of edges).
+      The current file will trigger SUMO "no route found" warnings / errors
+      and vehicles may not depart. Use randomTrips.py or specify explicit routes.
+    - get_state() direction classification uses heuristic string matching
+      ("top", "bot", "_0_", "_2_") on SUMO edge IDs — fragile and may
+      misclassify lanes if edge naming changes.
+    - SUMOEnvironment is a context manager (with env:) but run_sumo_gui.py
+      may not always use it as such — TraCI connection could leak if exception.
+  Interlinking: Used by scripts/run_sumo_gui.py, main.py (sumo-gui mode).
+
+--------------------------------------------------------------------------------
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│  LAYER 2: MODELS                                                            │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+FILE: src/models/traffic_model.py                                   SCORE: 8/10
+  Purpose : TrafficSignalModel (MLP), LSTM, GRU, Linear; training & eval funcs.
+  Strengths:
+    - Architecture [256, 128, 64, 32] with BatchNorm + LeakyReLU + dropout.
+    - Kaiming init for LeakyReLU — correct choice.
+    - AdamW + CosineAnnealingLR + gradient clipping (1.0) — modern training.
+    - FedProx proximal term correctly implemented in train_model().
+    - Smooth L1 (Huber) loss for robust regression.
+    - GPU-agnostic via DeviceManager.
+  Issues [PERFORMANCE — HIGH PRIORITY]:
+    - get_parameters() does: [p.detach().cpu().numpy() for p in model.parameters()]
+      This forces GPU→CPU transfer every call. Called twice per FL round per
+      intersection (once in fit(), once in aggregation).
+      At 9 intersections × 50 rounds = 900 GPU→CPU copies of a ~100K param model.
+    - set_parameters() similarly forces CPU→GPU via numpy loop per layer.
+    - list(model.parameters()) creates a Python list each call — minor but avoidable.
+    - LSTM/GRU models (LSTMTrafficModel, GRUTrafficModel) are defined but never
+      used in any experiment runner. They are dead code in the current pipeline.
+  Interlinking: Used by adaptive_fl.py, local_ml.py, centralized_ml.py,
+                federated_learning/client.py, run_byzantine.py.
+
+--------------------------------------------------------------------------------
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│  LAYER 3: FEDERATED LEARNING                                                │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+FILE: src/federated_learning/aggregation.py                         SCORE: 7/10
+  Purpose : FedAvg, Median, Trimmed Mean, Krum, Multi-Krum aggregation.
+  Strengths:
+    - All five Byzantine-robust strategies implemented correctly.
+    - multi_krum_aggregate selects f+1 "good" models (correct per Blanchard 2017).
+    - trimmed_mean_aggregate clips top/bottom k values per parameter.
+    - AggregationStrategy enum provides type-safe strategy selection.
+  Issues [PERFORMANCE]:
+    - _compute_distances() uses nested Python loop: O(n²) × O(d) per aggregation
+      where d = param dimensions. For n=9 clients this is fine. At n=100+,
+      this becomes a bottleneck. Should use numpy broadcasting:
+        diffs = params[i] - params[j]  →  np.linalg.norm(diffs)
+      or scipy.spatial.distance.cdist for the full matrix.
+    - All aggregation operates on CPU numpy arrays even when GPU is available.
+      For large models, these numpy operations could run on GPU via torch.
+    - AggregationStrategy enum defined here but run_byzantine.py passes string
+      literals ("fedavg", "quality_aware") to adaptive_fl.py — enum is UNUSED.
+      The string-to-dispatch logic is fragmented across files.
+  Interlinking: Called by adaptive_fl.py (via robust_aggregate). NOT called
+               directly by run_ieee.py or run_byzantine.py.
+
+FILE: src/federated_learning/server.py                              SCORE: 6/10
+  Purpose : Flower-based FL server (distributed deployment).
+  Strengths:
+    - Correct weighted_average metric aggregation.
+    - Clean FedAvg strategy setup via Flower.
+    - YAML config loading for deployment.
+  Issues [DISCONNECT — HIGH]:
+    - This file is NOT used in any IEEE experiment. The main experiment pipeline
+      (run_ieee.py, run_byzantine.py) uses AdaptiveFLController (adaptive_fl.py)
+      which runs FL in-process. server.py is for a distributed, socket-based
+      deployment that is never invoked by main.py ieee/byzantine modes.
+    - FedAvg strategy here uses plain FedAvg — NOT the FedProx or quality-aware
+      aggregation used in the actual experiments. Results from distributed
+      deployment would differ from published results.
+    - flwr import not in requirements.txt — will fail on fresh install.
+  Interlinking: Only used by scripts/run_fl_server.py (not in main.py's MODES).
+
+FILE: src/federated_learning/client.py                              SCORE: 6/10
+  Purpose : Flower-based FL client (distributed deployment).
+  Strengths:
+    - Correct NumPyClient interface implementation.
+    - Device-aware via get_device().
+    - 80/20 train/test split on local data.
+  Issues [DISCONNECT]:
+    - Same disconnect as server.py — not used in IEEE experiments.
+    - FedProx proximal term NOT applied here (plain train_model() call).
+      So distributed deployment would use standard FedAvg locally, not FedProx.
+    - test split uses features[:split_idx] / features[split_idx:] — sequential
+      split, not random. For time-series data this is actually correct, but
+      it's inconsistent with adaptive_fl.py's random evaluation approach.
+  Interlinking: Only used by scripts/run_fl_client.py (not in main.py's MODES).
+
+--------------------------------------------------------------------------------
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│  LAYER 4: BASELINES                                                         │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+FILE: src/baselines/adaptive_fl.py                                  SCORE: 8/10
+  Purpose : Main FL controller — FedProx, quality-aware aggregation, simulation.
+  Strengths:
+    - FedProx proximal term with μ=0.05 prevents client drift.
+    - Quality-aware aggregation: α_k = n_k × (L_k + ε)^(-1) is novel contribution.
+    - Patience-based early stopping for convergence.
+    - Uses "global_mae" as metric key consistently (matches metrics.py, plots).
+    - GPU-aware via DeviceManager.
+  Issues:
+    - get_green_duration() hard-codes a 45/55 ML/heuristic blend:
+        duration = 0.45 * prediction + 0.55 * heuristic_optimal
+      This means the ML model contributes LESS THAN HALF of the final decision.
+      The published "FL improvement" is partly the heuristic, not purely ML.
+      If the heuristic is removed, FL performance may degrade (but would be
+      a purer ML result). This hybrid is undocumented in the paper.
+    - get_green_duration() is DUPLICATED VERBATIM in centralized_ml.py.
+      Should be a shared utility function.
+    - federated_averaging() handles "quality_aware" inline with if/else, then
+      delegates all others to robust_aggregate() — inconsistent dispatch pattern.
+    - Memory accumulation: round_metrics list grows unbounded over 50 rounds
+      (each entry stores per-round stats). Fine at 50 rounds.
+  Interlinking: Core of run_ieee.py, run_byzantine.py. Depends on
+               traffic_model.py, aggregation.py, device.py.
+
+FILE: src/baselines/centralized_ml.py                              SCORE: 7/10
+  Purpose : Centralized ML baseline — pools all raw data, trains single model.
+  Strengths:
+    - Correctly represents privacy-violating upper bound.
+    - Same architecture/training as FL for fair comparison.
+    - Included in all comparison plots.
+  Issues:
+    - get_green_duration() copied word-for-word from adaptive_fl.py.
+      This is the 3rd copy of this heuristic (generator.py has a similar one).
+      Any change to the blend ratio (0.45/0.55) must be updated in 2 places.
+    - train() generates fresh data each call via generator — not pooling
+      pre-existing intersection data. Re-generating data wastes computation
+      and introduces randomness not captured in the seed if called after other
+      generators have run.
+
+FILE: src/baselines/local_ml.py                                     SCORE: 7/10
+  Purpose : Local-ML baseline — each intersection trains its own model.
+  Strengths:
+    - GPU-aware via get_device().
+    - Clean per-intersection model management.
+  Issues:
+    - evaluate_models() at line 219 calls generator.get_all_intersections_data()
+      which GENERATES NEW DATA rather than evaluating on a true held-out set.
+      The "test MAE" is therefore from the same distribution as training
+      (new samples, same Poisson process) — this inflates apparent performance.
+    - sys.path.insert() at line 15 — all baselines use this path hack.
+      A proper package install (pip install -e .) would eliminate this.
+
+FILE: src/baselines/fixed_time.py                                   SCORE: 8/10
+  Purpose : Fixed-time baseline (30s green, unchanging).
+  Strengths:
+    - Simplest correct implementation.
+    - FixedTimeConfig dataclass allows easy parameter sweeps.
+    - evaluate_fixed_time() utility for multi-config comparison.
+  Issues:
+    - cycle_length = 66 in FixedTimeConfig but actual cycle is determined by
+      intersection.green_duration (30s) + yellow (3s) × 2 = 66s — correct,
+      but cycle_length field is never validated against the actual simulation.
+
+FILE: src/baselines/actuated.py                                     SCORE: 7/10
+  Purpose : Actuated (sensor-based) baseline — industry standard.
+  Strengths:
+    - Gap-out logic and starvation prevention are correctly modeled.
+    - Stronger than fixed-time — good that it's included.
+  Issues [BUG]:
+    - phase_timer (line 135, 165) is incremented every step but never reset
+      on phase transition. In run_simulation(), the "current_green_time"
+      argument passed to get_green_duration() grows monotonically throughout
+      the simulation. This means the gap-out logic is based on total elapsed
+      time, not current phase duration — the actuated behavior is incorrect.
+      This may actually make actuated perform WORSE than it should, which
+      would inflate the apparent advantage of FL.
+
+--------------------------------------------------------------------------------
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│  LAYER 5: NETWORK & CLOUD SIMULATION                                        │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+FILE: src/network_simulation/network_layer.py                       SCORE: 6/10
+  Purpose : Models V2I network latency, packet loss, bandwidth for FL comms.
+  Strengths:
+    - Thread-safe with _lock.
+    - Time-varying congestion (peak-hour model).
+    - Realistic jitter and packet loss simulation.
+  Issues [CRITICAL — PERFORMANCE]:
+    - simulate_model_update() calls time.sleep(latency / 1000.0) on line 139.
+      This causes REAL wall-clock delays. For a 10ms simulated latency with
+      9 clients × 2 directions × 50 rounds = 900 sleeps × 10ms = 9 seconds
+      of pure sleeping added to each experiment run.
+      Network simulation should be purely mathematical — never sleep().
+    - NetworkAwareClient is defined but never used in experiment runners.
+      The network layer is only exercised by run_with_ns3.py and
+      src/experiments/network_stress.py, not the main IEEE experiments.
+  Interlinking: Used by network_stress.py, run_with_ns3.py. NOT used by
+               run_ieee.py — network effects are not modeled in IEEE results.
+
+FILE: src/cloudsim_python/edge_cloud_sim.py                         SCORE: 7/10
+  Purpose : CloudSim-inspired edge/cloud resource model (MI/MIPS scheduling).
+  Strengths:
+    - ProcessingElement, VM, Cloudlet, Host, Datacenter hierarchy is correct.
+    - Execution time formula (MI/MIPS) matches CloudSim semantics.
+    - 10% variance on execution time adds realism.
+  Issues:
+    - Cloudlets execute sequentially on each edge VM. Real edge computing
+      has concurrent task execution. The sequential model underestimates
+      parallelism and overestimates wall-clock time.
+    - simulation_time advances globally (line 248) — cloudlets can't overlap
+      even if separate VMs could handle them simultaneously.
+    - NUM_EDGE_NODES = 4 hardcoded as class constant. When used with
+      9-intersection SUMO grid, this mismatch means 4 VMs for 9 clients.
+    - Not connected to actual FL training — cloudlet lengths (10000 MI for
+      local training) are fixed constants, not derived from actual model size.
+  Interlinking: Used only by scripts/run_cloudsim.py. NOT used by run_ieee.py.
+
+--------------------------------------------------------------------------------
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│  LAYER 6: UTILITIES                                                         │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+FILE: src/utils/device.py                                           SCORE: 9/10
+  Purpose : GPU/MPS/CPU singleton device manager.
+  Strengths:
+    - Singleton pattern prevents multiple device detections.
+    - RESILNET_DEVICE env var override for testing.
+    - MPS (Apple Silicon) support.
+    - Clean public API: get_device(), to_device(), is_gpu_available().
+  Issues:
+    - Minor: DeviceManager instance is module-level (singleton via variable,
+      not a class-level metaclass). Multiple imports are fine, but not
+      thread-safe if two threads call DeviceManager() simultaneously before
+      instance is set. In practice this never happens.
+  Interlinking: Imported by all model and baseline files. Foundation layer.
+
+FILE: src/utils/reproducibility.py                                  SCORE: 8/10
+  Purpose : Seed all RNGs (random, numpy, torch, cuda) + ExperimentLogger.
+  Strengths:
+    - Correctly seeds PYTHONHASHSEED via os.environ.
+    - torch.backends.cudnn.deterministic = True for full reproducibility.
+    - ExperimentLogger supports JSON + CSV export.
+  Issues:
+    - set_global_seed() called 6+ times per experiment (once per trial in
+      run_ieee.py) — redundant calls but harmless.
+    - ExperimentLogger is defined but NEVER CALLED in run_ieee.py or
+      run_byzantine.py. All logging is done with print() directly.
+  Interlinking: Called by run_ieee.py, run_byzantine.py, run_demo.py.
+
+FILE: src/utils/metrics.py                                          SCORE: 8/10
+  Purpose : Traffic metrics (Jain's fairness), ML metrics (R², MAPE), comparison.
+  Strengths:
+    - Jain's Fairness Index correctly computed: (sum x)² / (n × sum x²).
+    - calculate_convergence_metrics() handles both "global_mae" and "mae" keys.
+    - compare_methods() + generate_comparison_table() are well-structured.
+    - calculate_ml_metrics() includes R², MAPE, RMSE, MAE, MSE.
+  Issues:
+    - MAPE divides only on non-zero actual values (line 94 mask) — correct.
+      But MAPE is undefined when actual = 0 and is dropped silently.
+    - calculate_traffic_metrics() expects intersection objects with
+      .total_throughput attribute — tight coupling to intersection.py.
+    - generate_comparison_table() hardcodes "Fixed-Time" as baseline name
+      in improvements section header (line 244) — incorrect when comparing
+      Local-ML vs FL.
+  Interlinking: Used by comprehensive_runner.py, run_ieee.py (indirectly).
+
+FILE: src/utils/statistical_tests.py                               SCORE: 9/10
+  Purpose : Paired t-test, Wilcoxon, bootstrap CI, Cohen's d, normality test.
+  Strengths:
+    - Textbook publication-quality statistical analysis.
+    - Normality check to pick parametric vs non-parametric test.
+    - Bootstrap CI with 10000 samples — robust for small n.
+    - Effect size (Cohen's d) with interpretation ("small/medium/large").
+    - LaTeX table generation for direct paper inclusion.
+  Issues:
+    - NEVER CALLED in run_ieee.py despite multi-seed experiment results being
+      available. The ablation results have 5 seeds but no formal test runs.
+      Five seeds is below the Wilcoxon minimum (n=6 for p<0.05 one-tailed)
+      — this is a fundamental limitation, but the module could at least
+      compute and report the bootstrap CI.
+    - wilcoxon_signed_rank_test() uses zero_method='zsplit' — correct for
+      handling ties, but rarely documented in papers.
+  Interlinking: Imported in comprehensive_runner.py, NOT in run_ieee.py.
+
+FILE: src/utils/privacy_metrics.py                                 SCORE: 7/10
+  Purpose : DP module, privacy scoring, communication efficiency metrics.
+  Strengths:
+    - DifferentialPrivacyModule correctly implements gradient clipping + noise.
+    - Privacy score formula (0-100) is transparent and tunable.
+    - compare_privacy_centralized_vs_fl() is publication-ready.
+  Issues:
+    - _calculate_noise_multiplier() uses simplified formula: sqrt(2 ln(1.25/δ))/ε
+      This is the Gaussian mechanism bound, not moments accountant. At ε=1,
+      this gives noise_multiplier ≈ 4.5 — very high. Real DP-SGD would use
+      Rényi DP for tighter bounds. The module warns about this but it
+      should not be used for formal DP guarantees in the paper.
+    - membership_inference_risk formula (min(0.3, rounds/(clients×100))) is
+      a heuristic with no theoretical backing.
+    - This module is NOT called in run_ieee.py. Privacy claims in the paper
+      are qualitative ("FL doesn't share raw data"), not backed by these metrics.
+  Interlinking: Only used in run_comprehensive.py and run_publication.py.
+
+FILE: src/utils/visualization.py                                    SCORE: 8/10
+  Purpose : Traffic plots, radar charts, t-SNE, non-IID visualization.
+  Strengths:
+    - plot_radar_chart() saves both PNG and PDF — good for LaTeX.
+    - plot_tsne_traffic_states() handles sklearn version differences gracefully.
+    - Non-IID analysis (4-panel) is publication-ready.
+  Issues:
+    - plot_training_metrics() and plot_federated_convergence() call plt.show()
+      in non-interactive contexts — blocks execution in headless environments.
+      Other functions use plt.close() — inconsistent.
+    - create_tsne_from_generator() hardcodes 4-intersection labels (line 537):
+      "Int. 0 (Downtown)", "Int. 1 (Commercial)", etc. — fails silently for
+      9-intersection grid (labels dict has only 4 entries).
+    - plt.cm.Set1 with linspace for 9 intersections will reuse colors —
+      use tab10 or a 9-color palette for the SUMO 3x3 grid.
+  Interlinking: Used by run_publication.py. run_ieee.py uses professional_plots.py.
+
+FILE: src/utils/professional_plots.py                              SCORE: 8/10
+  Purpose : IEEE-quality figures (convergence, comparison, network stress).
+  Strengths:
+    - Consistent color palette (COLORS dict).
+    - seaborn-v0_8-whitegrid style with explicit rcParams.
+    - Saves PNG (150 dpi preview) + PDF (300 dpi for publication).
+    - All functions used in run_ieee.py and produce the actual paper figures.
+  Issues:
+    - 'seaborn-v0_8-whitegrid' style string is matplotlib ≥ 3.6 specific.
+      Older matplotlib uses 'seaborn-whitegrid'. Will crash silently and fall
+      back to default style on older installs (warnings.filterwarnings('ignore')
+      hides this at line 12).
+    - Centralized-ML is included in some plots but not others — review each
+      function to ensure all 4 methods (Fixed, Actuated, Local, FL, Centralized)
+      are consistently shown.
+  Interlinking: Core dependency of run_ieee.py for all paper figures.
+
+FILE: src/utils/config_loader.py                                    SCORE: 7/10
+  Purpose : YAML config loader with defaults.
+  Strengths:
+    - Graceful fallback to default config when YAML not found.
+    - Clean Path handling.
+  Issues [DISCONNECT]:
+    - get_default_config() specifies hidden_layers: [64, 32].
+      But adaptive_fl.py, run_ieee.py, run_byzantine.py ALL hardcode
+      hidden_layers: [256, 128, 64, 32].
+      The config file and the actual code are DISCONNECTED — no experiment
+      runner reads the YAML config for the main experiments.
+    - config/config.yaml does not exist in the repo (only config_loader.py).
+      Every call to load_config() prints "Warning: Config file not found"
+      and returns stale defaults.
+  Interlinking: Used by federated_learning/client.py and server.py only.
+               Main experiment runners do NOT use this module.
+
+--------------------------------------------------------------------------------
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│  LAYER 7: EXPERIMENTS (src/experiments/)                                    │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+FILE: src/experiments/comprehensive_runner.py                       SCORE: 7/10
+  Purpose : Orchestrates all experiments + generates full report.
+  Strengths:
+    - Single run_all() entry point.
+    - Results stored in structured dict with metadata.
+    - Uses ExperimentLogger (the only user of it).
+  Issues:
+    - Imports professional_plots.py functions that may not exist in older
+      versions of the file (create_summary_dashboard is referenced but may
+      not be defined in current professional_plots.py).
+    - fl_rounds=100 default (vs run_ieee.py's 50) — inconsistency creates
+      confusion about which configuration was used for published results.
+  Interlinking: Used by scripts/run_comprehensive.py.
+
+FILE: src/experiments/network_stress.py                            SCORE: 7/10
+  Purpose : Tests FL performance under varying network conditions.
+  Strengths:
+    - Sweeps latency multipliers to generate the "network resilience" figure.
+    - MAE variation ≤ 0.03 over 2168% latency increase — strong paper claim.
+  Issues:
+    - Uses NetworkSimulator.simulate_model_update() which has time.sleep().
+      Network stress experiments may run slowly due to accumulated sleeps.
+
+FILE: src/experiments/scalability.py                               SCORE: 7/10
+  Purpose : Scalability experiment from 4 to 25 intersections.
+  Strengths:
+    - Tests core scalability claim in the paper.
+  Issues:
+    - Not tested with the SUMO 9-intersection configuration.
+
+FILE: src/experiments/live_data_simulation.py                      SCORE: 6/10
+  Purpose : Real-time streaming data simulation.
+  Strengths:
+    - Demonstrates real-time applicability concept.
+  Issues:
+    - Not connected to IEEE experiment pipeline.
+    - Results not referenced in any paper figure or table.
+
+--------------------------------------------------------------------------------
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│  LAYER 8: SCRIPTS                                                           │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+FILE: scripts/run_ieee.py                                           SCORE: 8/10
+  Purpose : Main IEEE experiment runner (5 seeds, 50 rounds, 4 intersections).
+  Strengths:
+    - 5-seed statistical rigor for main experiments.
+    - 5-seed ablation study with error bars.
+    - Generalization test on held-out seed 9999.
+    - Saves JSON + LaTeX table + 4 PDF figures.
+    - --intersections flag supports 4 or 9 intersection modes.
+    - --ablation-seeds flag (3 or 5 seeds per ablation config).
+  Issues:
+    - set_global_seed() called 6 times per full run (once per trial + once
+      per generalization test + once per ablation config). Redundant but harmless.
+    - Ablation study uses 4 intersections even when --intersections 9 is passed
+      (run_ablation_study() hardcodes num_intersections=4 in its signature default).
+    - statistical_tests.py NOT imported — 5-seed results computed but no formal
+      statistical tests (Wilcoxon, bootstrap CI) are reported in the output.
+    - run_generalization_test() saves to results/ieee/generalization_test.json
+      but the path is hardcoded (not parameterized by output_dir).
+
+FILE: scripts/run_byzantine.py                                      SCORE: 7/10
+  Purpose : Byzantine robustness evaluation (0/1/2 Byzantine clients, 5 strategies).
+  Strengths:
+    - Shared local training across all strategies (5x speedup optimization).
+    - 5 Byzantine strategies compared in one run.
+    - Early stopping (patience ≥ 8 AND round ≥ 12) prevents wasted computation.
+    - Saves plot + LaTeX table.
+  Issues:
+    - PROJECT_ROOT was fixed (it was missing, causing NameError).
+    - local_epochs=5 reduced from 10 — this may produce weaker per-round models
+      than the main experiment (10 epochs), making Byzantine comparison slightly
+      inconsistent.
+    - "patience ≥ 8 AND round ≥ 12" thresholds are magic numbers not
+      documented or configurable.
+    - num_seeds=3 is hardcoded (not a CLI flag). Main experiments use 5 seeds.
+      Byzantine results will be less statistically robust.
+
+FILE: scripts/run_sumo_gui.py                                      SCORE: 7/10
+  Purpose : SUMO-GUI integration with FL training loop.
+  Strengths:
+    - Saves results to results/sumo/ directory.
+    - Auto-falls back to enhanced Poisson if SUMO not available.
+  Issues:
+    - Not verified to produce paper-quality results (no multi-seed, no comparison).
+
+FILE: scripts/run_demo.py                                          SCORE: 7/10
+  Purpose : Quick end-to-end demo (~2 minutes).
+  Issues:
+    - Uses only 1 seed, 20 rounds — demo results may not match paper.
+
+FILE: scripts/run_fl_server.py / run_fl_client.py                 SCORE: 6/10
+  Purpose : Distributed Flower-based FL deployment.
+  Issues:
+    - Uses plain FedAvg (not FedProx). Results would differ from published.
+    - flwr not in requirements.txt.
+    - Not tested in current codebase.
+
+FILE: main.py                                                       SCORE: 9/10
+  Purpose : Unified entry point — dispatches to scripts via subprocess.
+  Strengths:
+    - Clean MODES dict. Argparse with choices validation.
+    - Unknown args forwarded to child script (flexible).
+    - subprocess preserves cwd and returncode.
+  Issues:
+    - Subprocess approach means PyCharm/VS Code can't trace into scripts.
+      Direct import would enable debugging. Minor usability issue.
+
+--------------------------------------------------------------------------------
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│  LAYER 9: TOOLS                                                             │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+FILE: tools/generate_architecture.py                               SCORE: 7/10
+  Purpose : Generates architecture diagram for paper.
+  Issues:
+    - Standalone script — not integrated into main.py modes.
+
+FILE: tools/generate_comparison.py                                 SCORE: 7/10
+  Purpose : Generates method comparison figure from results JSON.
+  Issues:
+    - Reads hardcoded results/ieee/ieee_results.json — will fail if path changes.
+
+FILE: tools/generate_radar_plot.py                                 SCORE: 7/10
+  Purpose : Generates radar chart from results JSON.
+
+FILE: tools/generate_gen_plot.py                                   SCORE: 7/10
+  Purpose : Generates generalization plot.
+
+
+================================================================================
+SECTION 2  —  INTERLINKING MAP (who calls whom)
+================================================================================
+
+  main.py
+    └─► scripts/run_ieee.py
+    │     ├─► src/baselines/adaptive_fl.py        (FL controller)
+    │     │     ├─► src/models/traffic_model.py   (training)
+    │     │     ├─► src/federated_learning/aggregation.py
+    │     │     └─► src/utils/device.py
+    │     ├─► src/baselines/local_ml.py           (Local baseline)
+    │     │     └─► src/models/traffic_model.py
+    │     ├─► src/baselines/centralized_ml.py     (Centralized baseline)
+    │     ├─► src/baselines/fixed_time.py         (Fixed baseline)
+    │     ├─► src/baselines/actuated.py           (Actuated baseline) [if included]
+    │     ├─► src/traffic_generator/generator.py
+    │     │     └─► src/traffic_generator/intersection.py
+    │     ├─► src/utils/reproducibility.py
+    │     └─► src/utils/professional_plots.py
+    │
+    └─► scripts/run_byzantine.py
+          ├─► src/baselines/adaptive_fl.py
+          ├─► src/traffic_generator/generator.py
+          └─► src/utils/reproducibility.py
+
+  DISCONNECTED PATHS (exist but NOT called by main experiment chain):
+    src/federated_learning/server.py  ←→  scripts/run_fl_server.py
+    src/federated_learning/client.py  ←→  scripts/run_fl_client.py
+    src/network_simulation/network_layer.py  ←→  src/experiments/network_stress.py
+    src/cloudsim_python/edge_cloud_sim.py  ←→  scripts/run_cloudsim.py
+    src/utils/statistical_tests.py  ←  NEVER CALLED IN IEEE PIPELINE
+    src/utils/privacy_metrics.py  ←  NOT IN IEEE PIPELINE
+    src/utils/config_loader.py  ←  NOT IN IEEE PIPELINE
+    src/experiments/live_data_simulation.py  ←  ORPHANED
+    src/models/traffic_model.py (LSTM, GRU classes)  ←  UNUSED
+
+
+================================================================================
+SECTION 3  —  SCALE ISSUES (performance at larger intersection counts)
+================================================================================
+
+ISSUE 1  GPU↔CPU transfers in FL loop                              SEVERITY: HIGH
+  Location: src/models/traffic_model.py get_parameters()/set_parameters()
+  Impact: Every FL round, ALL intersection models move GPU→CPU (aggregate)
+          then CPU→GPU (broadcast). At 9 intersections × 50 rounds × 2
+          directions = 900 transfers of ~400KB (FP32, [256,128,64,32] model).
+          This is the single largest performance bottleneck.
+  Fix: Keep parameters on GPU as torch tensors during aggregation. Convert
+       to numpy only at final save / evaluation.
+
+ISSUE 2  O(n²) distance computation in aggregation                SEVERITY: MED
+  Location: src/federated_learning/aggregation.py _compute_distances()
+  Impact: For n=9: 36 pairs — negligible. For n=100: 4950 pairs × parameter
+          iterations — seconds per aggregation step.
+  Fix: Use numpy broadcasting or scipy.spatial.distance.cdist.
+
+ISSUE 3  time.sleep() in network simulation                       SEVERITY: MED
+  Location: src/network_simulation/network_layer.py line 139
+  Impact: Adds real wall-clock delay per model update transmission.
+          Not active in IEEE experiments but affects run_with_ns3.py runs.
+  Fix: Remove time.sleep(); track simulated latency as a metric only.
+
+ISSUE 4  Sequential cloudlet execution in EdgeCloudSimulator      SEVERITY: LOW
+  Location: src/cloudsim_python/edge_cloud_sim.py execute_cloudlet()
+  Impact: 4 edge VMs execute sequentially — simulation_time advances
+          linearly instead of showing parallel speedup.
+  Fix: Track per-VM timelines independently.
+
+ISSUE 5  list.pop(0) in Lane.remove_vehicles()                   SEVERITY: LOW
+  Location: src/traffic_generator/intersection.py line 39
+  Impact: O(n) per vehicle discharge. Fine at queue_length≤50. At 100+: slow.
+  Fix: Replace list with collections.deque; use popleft().
+
+ISSUE 6  Data re-generation at test time in local_ml.py          SEVERITY: MED
+  Location: src/baselines/local_ml.py line 219
+  Impact: Test MAE in local_ml evaluation uses freshly generated data,
+          not a static held-out set. Makes Local-ML test MAE appear better
+          than it is (same distribution, no test contamination but no
+          true held-out evaluation either). FL and Local-ML should be
+          evaluated on the SAME static test set for fair comparison.
+
+ISSUE 7  Actuated controller phase timer bug                      SEVERITY: MED
+  Location: src/baselines/actuated.py line 165
+  Impact: phase_timer grows monotonically; never reset on phase switch.
+          Actuated baseline performs worse than the real algorithm would.
+          This inflates FL's apparent improvement over Actuated.
+
+
+================================================================================
+SECTION 4  —  CODE DUPLICATION
+================================================================================
+
+DUPLICATION 1  get_green_duration() heuristic (0.45 ML + 0.55 heuristic)
+  Files: src/baselines/adaptive_fl.py (lines ~180-210)
+         src/baselines/centralized_ml.py (lines ~130-160)
+  Fix: Extract to src/utils/signal_control.py as get_green_duration(model, features, ...)
+
+DUPLICATION 2  sys.path.insert(0, ...) boilerplate
+  Files: ALL src/baselines/*.py, src/federated_learning/*.py,
+         src/experiments/*.py — every file has this.
+  Fix: Install the package with: pip install -e . (pyproject.toml or setup.py)
+
+DUPLICATION 3  Optimal green label computation
+  Files: src/traffic_generator/generator.py (_calculate_optimal_green)
+         src/traffic_generator/sumo_integration.py (_optimal_green — Webster)
+         src/baselines/adaptive_fl.py (heuristic_optimal used in get_green_duration)
+  Three different formulations of "what is optimal green?" — inconsistent.
+  Webster formula in sumo_integration is best-justified; the generator heuristic
+  and FL blend use different logic.
+
+DUPLICATION 4  experiment_result dict structure
+  Files: All baseline run_simulation() methods return dicts with the same
+         keys (method, avg_waiting_time, avg_queue_length, total_throughput,
+         throughput_per_hour, mse, mae) — but not all keys are present in all.
+         actuated.py is missing mse/mae; fixed_time.py is missing mse/mae.
+  Fix: Define a BaselineResult dataclass with optional fields.
+
+
+================================================================================
+SECTION 5  —  SUMMARY SCORES BY LAYER
+================================================================================
+
+  Layer                     Avg Score   Key Concern
+  ────────────────────────  ─────────   ──────────────────────────────────────
+  Data / Simulation            8.0      Label quality, non-seeded arrivals
+  Models                       8.0      GPU↔CPU transfers per round
+  Federated Learning           6.5      server/client DISCONNECTED from pipeline
+  Baselines                    7.4      Actuated timer bug; code duplication
+  Network / Cloud              6.5      time.sleep(), sequential cloudlets
+  Utilities                    8.0      stat_tests.py unused; config mismatch
+  Scripts / Entry Points       7.7      Byzantine local_epochs inconsistency
+  ────────────────────────  ─────────
+  OVERALL PROJECT AVERAGE      7.4 / 10
+
+
+================================================================================
+SECTION 6  —  TOP 10 RECOMMENDATIONS (priority order)
+================================================================================
+
+ 1. FIX  Actuated controller phase_timer reset bug (actuated.py:165)
+         — May inflate FL's advantage vs actuated baseline unfairly.
+
+ 2. FIX  Eliminate time.sleep() from network_layer.py (line 139)
+         — Causes real wall-clock delays in simulation code.
+
+ 3. OPTIMIZE  GPU-native aggregation in aggregation.py
+         — Keep model parameters as torch tensors through the entire FL round.
+         — Only convert to numpy for final JSON save.
+
+ 4. CONNECT  Call statistical_tests.py from run_ieee.py
+         — Compute bootstrap CI on 5-seed FL vs Local-ML results.
+         — Report p-value and CI in paper (currently missing).
+
+ 5. FIX  Route file in sumo_integration.py (add valid <route> edges)
+         — Current rou.xml generates vehicles without routes — SUMO will error.
+
+ 6. UNIFY  get_green_duration() duplication
+         — Extract to shared utility; update both adaptive_fl.py and centralized_ml.py.
+
+ 7. FIX  create_tsne_from_generator() hardcoded 4-intersection labels (visualization.py:537)
+         — Will break silently for 9-intersection SUMO grid.
+
+ 8. ALIGN  config_loader.py defaults with actual experiment parameters
+         — hidden_layers: [256, 128, 64, 32], learning_rate: 0.002, etc.
+         — Or make experiment runners read from config instead of hardcoding.
+
+ 9. DOCUMENT  server.py / client.py (Flower) disconnect from main pipeline
+         — These use plain FedAvg, not FedProx. Add a warning comment that
+           results will differ from published IEEE experiments.
+
+10. REPLACE  list.pop(0) with collections.deque in intersection.py
+         — Low-priority but correct data structure for a FIFO queue.
+
+
+================================================================================
+END OF QUALITY REPORT
+================================================================================

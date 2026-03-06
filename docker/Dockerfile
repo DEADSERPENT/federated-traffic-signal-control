@@ -33,19 +33,25 @@ RUN pip install --upgrade pip && \
 COPY . .
 
 # Create necessary directories
-RUN mkdir -p /app/data /app/results /app/results/comprehensive /app/results/logs
+RUN mkdir -p /app/data \
+             /app/results/ieee \
+             /app/results/byzantine \
+             /app/results/comprehensive \
+             /app/results/scalability \
+             /app/results/sumo \
+             /app/results/logs
 
 # Set permissions
-RUN chmod +x /app/*.py 2>/dev/null || true
+RUN chmod +x /app/main.py /app/scripts/*.py 2>/dev/null || true
 
-# Default command - run comprehensive experiment
-CMD ["python", "run_comprehensive.py", "--quick"]
+# Default command - run comprehensive experiment via unified entry point
+CMD ["python", "main.py", "--mode", "comprehensive"]
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
-    CMD python -c "import torch; import flwr; print('OK')" || exit 1
+    CMD python -c "import torch; import numpy; print('OK')" || exit 1
 
 # Labels
 LABEL maintainer="Traffic Signal Control Team" \
-      version="1.0.0" \
-      description="Federated Learning-based Adaptive Traffic Signal Control System"
+      version="2.0.0" \
+      description="ResilNet-FL: Byzantine-Robust Federated Learning for Traffic Signal Control"

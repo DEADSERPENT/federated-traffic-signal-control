@@ -7,7 +7,8 @@ import sys
 import os
 
 # Add src to path
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'src'))
+PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, os.path.join(PROJECT_ROOT, 'src'))
 
 from traffic_generator import TrafficDataGenerator
 from utils.visualization import plot_traffic_metrics
@@ -21,7 +22,7 @@ def main():
     print("=" * 60)
 
     # Load configuration
-    config = load_config("config/config.yaml")
+    config = load_config(os.path.join(PROJECT_ROOT, "config", "config.yaml"))
     print("\nConfiguration loaded successfully")
 
     # Initialize traffic data generator

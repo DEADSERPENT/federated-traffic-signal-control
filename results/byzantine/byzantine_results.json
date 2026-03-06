@@ -1,0 +1,93 @@
+{
+  "metadata": {
+    "timestamp": "2026-03-06T13:50:22.030534",
+    "num_intersections": 9,
+    "byzantine_counts": [
+      0,
+      1,
+      2
+    ],
+    "strategies": [
+      "fedavg",
+      "quality_aware",
+      "trimmed_mean",
+      "median",
+      "multi_krum"
+    ],
+    "num_rounds": 40,
+    "noise_scale": 50.0,
+    "seeds": [
+      42,
+      43,
+      44
+    ]
+  },
+  "results": {
+    "0": {
+      "fedavg": {
+        "mean": 1.9272687479301733,
+        "std": 0.26974871027462655
+      },
+      "quality_aware": {
+        "mean": 1.9272687479301733,
+        "std": 0.26974871027462655
+      },
+      "trimmed_mean": {
+        "mean": 1.9154456014986394,
+        "std": 0.266435975499705
+      },
+      "median": {
+        "mean": 1.9108062165754813,
+        "std": 0.21951735042839726
+      },
+      "multi_krum": {
+        "mean": 1.9281176085825322,
+        "std": 0.2664590083784772
+      }
+    },
+    "1": {
+      "fedavg": {
+        "mean": Infinity,
+        "std": NaN
+      },
+      "quality_aware": {
+        "mean": Infinity,
+        "std": NaN
+      },
+      "trimmed_mean": {
+        "mean": 2.8898675441741943,
+        "std": 0.6141669726394636
+      },
+      "median": {
+        "mean": 3.086352851655748,
+        "std": 0.6943204536359778
+      },
+      "multi_krum": {
+        "mean": 2.934840851359897,
+        "std": 0.8185450720821655
+      }
+    },
+    "2": {
+      "fedavg": {
+        "mean": Infinity,
+        "std": NaN
+      },
+      "quality_aware": {
+        "mean": Infinity,
+        "std": NaN
+      },
+      "trimmed_mean": {
+        "mean": Infinity,
+        "std": NaN
+      },
+      "median": {
+        "mean": 5.665934341925162,
+        "std": 1.8819814034164648
+      },
+      "multi_krum": {
+        "mean": 4.547755519549052,
+        "std": 2.7129431144027585
+      }
+    }
+  }
+}

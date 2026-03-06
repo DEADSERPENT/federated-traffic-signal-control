@@ -1,0 +1,530 @@
+{
+  "timestamp": "20260305_195407",
+  "config": {
+    "train_rounds": 30,
+    "sim_steps": 600,
+    "seed": 42,
+    "no_gui": false,
+    "rebuild": false
+  },
+  "fl_training": [
+    {
+      "round": 1,
+      "avg_local_loss": 6.46012348598904,
+      "global_mse": 74.16690190633138,
+      "global_mae": 7.895039717356364,
+      "learning_rate": 0.002
+    },
+    {
+      "round": 2,
+      "avg_local_loss": 1.7278596485654514,
+      "global_mse": 15.186838467915853,
+      "global_mae": 2.768801662656996,
+      "learning_rate": 0.00198
+    },
+    {
+      "round": 3,
+      "avg_local_loss": 0.681188895056645,
+      "global_mse": 0.9125862452718947,
+      "global_mae": 0.4961005283726586,
+      "learning_rate": 0.0019602
+    },
+    {
+      "round": 4,
+      "avg_local_loss": 0.5873709714247121,
+      "global_mse": 0.29563938246832955,
+      "global_mae": 0.30690689550505745,
+      "learning_rate": 0.001940598
+    },
+    {
+      "round": 5,
+      "avg_local_loss": 0.5227419684330622,
+      "global_mse": 0.24599294281668133,
+      "global_mae": 0.30597682462798226,
+      "learning_rate": 0.0019211920199999999
+    },
+    {
+      "round": 6,
+      "avg_local_loss": 0.5105034430614777,
+      "global_mse": 0.2445100156797303,
+      "global_mae": 0.32806721991962856,
+      "learning_rate": 0.0019019800997999998
+    },
+    {
+      "round": 7,
+      "avg_local_loss": 0.4602394314068887,
+      "global_mse": 0.20017785413397682,
+      "global_mae": 0.288197527329127,
+      "learning_rate": 0.0018829602988019998
+    },
+    {
+      "round": 8,
+      "avg_local_loss": 0.45591723629169995,
+      "global_mse": 0.1942740653951963,
+      "global_mae": 0.2616431150171492,
+      "learning_rate": 0.0018641306958139799
+    },
+    {
+      "round": 9,
+      "avg_local_loss": 0.42908574144045514,
+      "global_mse": 0.16151009831163618,
+      "global_mae": 0.23756872945361668,
+      "learning_rate": 0.00184548938885584
+    },
+    {
+      "round": 10,
+      "avg_local_loss": 0.44534136582579875,
+      "global_mse": 0.16223715742429098,
+      "global_mae": 0.23921738233831194,
+      "learning_rate": 0.0018270344949672815
+    },
+    {
+      "round": 11,
+      "avg_local_loss": 0.42717035828779143,
+      "global_mse": 0.14944742868343988,
+      "global_mae": 0.23760248555077446,
+      "learning_rate": 0.0018087641500176086
+    },
+    {
+      "round": 12,
+      "avg_local_loss": 0.4005392136880093,
+      "global_mse": 0.16218378063705233,
+      "global_mae": 0.2598533696598477,
+      "learning_rate": 0.0017906765085174325
+    },
+    {
+      "round": 13,
+      "avg_local_loss": 0.39738889783620834,
+      "global_mse": 0.15896359831094742,
+      "global_mae": 0.25901001857386696,
+      "learning_rate": 0.0017727697434322582
+    },
+    {
+      "round": 14,
+      "avg_local_loss": 0.4031212536825074,
+      "global_mse": 0.16377627352873483,
+      "global_mae": 0.25796253316932255,
+      "learning_rate": 0.0017550420459979356
+    },
+    {
+      "round": 15,
+      "avg_local_loss": 0.3723774877273374,
+      "global_mse": 0.12941471445891592,
+      "global_mae": 0.21086374090777504,
+      "learning_rate": 0.0017374916255379561
+    },
+    {
+      "round": 16,
+      "avg_local_loss": 0.37335610741542447,
+      "global_mse": 0.12725336021847194,
+      "global_mae": 0.21089265081617567,
+      "learning_rate": 0.0017201167092825765
+    },
+    {
+      "round": 17,
+      "avg_local_loss": 0.36006710388594204,
+      "global_mse": 0.12784024907482994,
+      "global_mae": 0.2209311525026957,
+      "learning_rate": 0.0017029155421897507
+    },
+    {
+      "round": 18,
+      "avg_local_loss": 0.36373601026005214,
+      "global_mse": 0.12040891995032628,
+      "global_mae": 0.2112660159667333,
+      "learning_rate": 0.0016858863867678531
+    },
+    {
+      "round": 19,
+      "avg_local_loss": 0.3618202610976166,
+      "global_mse": 0.11488523624009556,
+      "global_mae": 0.19084769156244066,
+      "learning_rate": 0.0016690275229001746
+    },
+    {
+      "round": 20,
+      "avg_local_loss": 0.35239300152493847,
+      "global_mse": 0.11863368625442187,
+      "global_mae": 0.20307431452804142,
+      "learning_rate": 0.0016523372476711729
+    },
+    {
+      "round": 21,
+      "avg_local_loss": 0.3655192411194245,
+      "global_mse": 0.12565384598241913,
+      "global_mae": 0.19295722991228104,
+      "learning_rate": 0.0016358138751944612
+    },
+    {
+      "round": 22,
+      "avg_local_loss": 0.33404952691247064,
+      "global_mse": 0.09845318810807334,
+      "global_mae": 0.17867459770705965,
+      "learning_rate": 0.0016194557364425167
+    },
+    {
+      "round": 23,
+      "avg_local_loss": 0.3444014420836336,
+      "global_mse": 0.1405752698580424,
+      "global_mae": 0.23225574360953438,
+      "learning_rate": 0.0016032611790780915
+    },
+    {
+      "round": 24,
+      "avg_local_loss": 0.3425721212600668,
+      "global_mse": 0.11231318054099877,
+      "global_mae": 0.19001342438989216,
+      "learning_rate": 0.0015872285672873106
+    },
+    {
+      "round": 25,
+      "avg_local_loss": 0.3383454986744457,
+      "global_mse": 0.1161975550154845,
+      "global_mae": 0.1969762080245548,
+      "learning_rate": 0.0015713562816144376
+    },
+    {
+      "round": 26,
+      "avg_local_loss": 0.3389651893845035,
+      "global_mse": 0.11372707121902043,
+      "global_mae": 0.1739396419790056,
+      "learning_rate": 0.0015556427187982931
+    },
+    {
+      "round": 27,
+      "avg_local_loss": 0.34440016756869024,
+      "global_mse": 0.08823626860976219,
+      "global_mae": 0.15601013931963179,
+      "learning_rate": 0.00154008629161031
+    },
+    {
+      "round": 28,
+      "avg_local_loss": 0.32196501621769535,
+      "global_mse": 0.08437939402129915,
+      "global_mae": 0.13214040050903955,
+      "learning_rate": 0.0015246854286942069
+    },
+    {
+      "round": 29,
+      "avg_local_loss": 0.32620615682875115,
+      "global_mse": 0.10163993740247355,
+      "global_mae": 0.1512907851073477,
+      "learning_rate": 0.001509438574407265
+    },
+    {
+      "round": 30,
+      "avg_local_loss": 0.29921579190219444,
+      "global_mse": 0.08985761594441202,
+      "global_mae": 0.13740889728069305,
+      "learning_rate": 0.0014943441886631922
+    }
+  ],
+  "sumo_simulation": {
+    "total_steps": 600,
+    "per_step_sample": [
+      {
+        "sim_time": 0,
+        "intersections": {
+          "A1": {
+            "queue": 0,
+            "wait": 0.0
+          },
+          "B0": {
+            "queue": 0,
+            "wait": 0.0
+          },
+          "B1": {
+            "queue": 2,
+            "wait": 0.0
+          },
+          "B2": {
+            "queue": 0,
+            "wait": 0.0
+          },
+          "C1": {
+            "queue": 0,
+            "wait": 0.0
+          }
+        }
+      },
+      {
+        "sim_time": 50,
+        "intersections": {
+          "A1": {
+            "queue": 3,
+            "wait": 4.75
+          },
+          "B0": {
+            "queue": 1,
+            "wait": 1.333
+          },
+          "B1": {
+            "queue": 5,
+            "wait": 0.6
+          },
+          "B2": {
+            "queue": 0,
+            "wait": 0.0
+          },
+          "C1": {
+            "queue": 0,
+            "wait": 0.0
+          }
+        }
+      },
+      {
+        "sim_time": 100,
+        "intersections": {
+          "A1": {
+            "queue": 4,
+            "wait": 19.917
+          },
+          "B0": {
+            "queue": 4,
+            "wait": 9.0
+          },
+          "B1": {
+            "queue": 16,
+            "wait": 33.95
+          },
+          "B2": {
+            "queue": 4,
+            "wait": 11.667
+          },
+          "C1": {
+            "queue": 0,
+            "wait": 0.0
+          }
+        }
+      },
+      {
+        "sim_time": 150,
+        "intersections": {
+          "A1": {
+            "queue": 9,
+            "wait": 37.083
+          },
+          "B0": {
+            "queue": 10,
+            "wait": 38.167
+          },
+          "B1": {
+            "queue": 31,
+            "wait": 97.5
+          },
+          "B2": {
+            "queue": 16,
+            "wait": 61.083
+          },
+          "C1": {
+            "queue": 9,
+            "wait": 17.0
+          }
+        }
+      },
+      {
+        "sim_time": 200,
+        "intersections": {
+          "A1": {
+            "queue": 10,
+            "wait": 71.5
+          },
+          "B0": {
+            "queue": 15,
+            "wait": 94.417
+          },
+          "B1": {
+            "queue": 44,
+            "wait": 190.1
+          },
+          "B2": {
+            "queue": 22,
+            "wait": 133.25
+          },
+          "C1": {
+            "queue": 9,
+            "wait": 54.5
+          }
+        }
+      },
+      {
+        "sim_time": 250,
+        "intersections": {
+          "A1": {
+            "queue": 18,
+            "wait": 121.583
+          },
+          "B0": {
+            "queue": 18,
+            "wait": 163.167
+          },
+          "B1": {
+            "queue": 58,
+            "wait": 316.75
+          },
+          "B2": {
+            "queue": 23,
+            "wait": 226.0
+          },
+          "C1": {
+            "queue": 10,
+            "wait": 93.167
+          }
+        }
+      },
+      {
+        "sim_time": 300,
+        "intersections": {
+          "A1": {
+            "queue": 21,
+            "wait": 201.083
+          },
+          "B0": {
+            "queue": 22,
+            "wait": 246.417
+          },
+          "B1": {
+            "queue": 75,
+            "wait": 478.7
+          },
+          "B2": {
+            "queue": 32,
+            "wait": 335.833
+          },
+          "C1": {
+            "queue": 12,
+            "wait": 134.833
+          }
+        }
+      },
+      {
+        "sim_time": 350,
+        "intersections": {
+          "A1": {
+            "queue": 27,
+            "wait": 69.417
+          },
+          "B0": {
+            "queue": 24,
+            "wait": 286.333
+          },
+          "B1": {
+            "queue": 70,
+            "wait": 505.0
+          },
+          "B2": {
+            "queue": 36,
+            "wait": 472.833
+          },
+          "C1": {
+            "queue": 15,
+            "wait": 190.75
+          }
+        }
+      },
+      {
+        "sim_time": 400,
+        "intersections": {
+          "A1": {
+            "queue": 26,
+            "wait": 115.5
+          },
+          "B0": {
+            "queue": 23,
+            "wait": 24.417
+          },
+          "B1": {
+            "queue": 87,
+            "wait": 257.9
+          },
+          "B2": {
+            "queue": 39,
+            "wait": 70.0
+          },
+          "C1": {
+            "queue": 16,
+            "wait": 257.333
+          }
+        }
+      },
+      {
+        "sim_time": 450,
+        "intersections": {
+          "A1": {
+            "queue": 28,
+            "wait": 226.917
+          },
+          "B0": {
+            "queue": 30,
+            "wait": 136.5
+          },
+          "B1": {
+            "queue": 97,
+            "wait": 349.8
+          },
+          "B2": {
+            "queue": 42,
+            "wait": 238.25
+          },
+          "C1": {
+            "queue": 22,
+            "wait": 83.5
+          }
+        }
+      },
+      {
+        "sim_time": 500,
+        "intersections": {
+          "A1": {
+            "queue": 42,
+            "wait": 381.417
+          },
+          "B0": {
+            "queue": 30,
+            "wait": 261.5
+          },
+          "B1": {
+            "queue": 108,
+            "wait": 603.25
+          },
+          "B2": {
+            "queue": 43,
+            "wait": 416.25
+          },
+          "C1": {
+            "queue": 24,
+            "wait": 177.5
+          }
+        }
+      },
+      {
+        "sim_time": 550,
+        "intersections": {
+          "A1": {
+            "queue": 42,
+            "wait": 556.417
+          },
+          "B0": {
+            "queue": 31,
+            "wait": 388.75
+          },
+          "B1": {
+            "queue": 133,
+            "wait": 906.8
+          },
+          "B2": {
+            "queue": 43,
+            "wait": 595.417
+          },
+          "C1": {
+            "queue": 26,
+            "wait": 194.583
+          }
+        }
+      }
+    ],
+    "mean_wait_s": 209.2607,
+    "median_wait_s": 148.6415,
+    "max_wait_s": 1256.35
+  }
+}

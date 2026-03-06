@@ -8,7 +8,8 @@ import os
 import argparse
 
 # Add src to path
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'src'))
+PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, os.path.join(PROJECT_ROOT, 'src'))
 
 from federated_learning.client import start_client
 
@@ -32,7 +33,7 @@ def main():
     parser.add_argument(
         "--config",
         type=str,
-        default="config/config.yaml",
+        default=os.path.join(PROJECT_ROOT, "config", "config.yaml"),
         help="Path to configuration file"
     )
 

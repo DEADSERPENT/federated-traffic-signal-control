@@ -30,7 +30,8 @@ import os
 import argparse
 
 # Add src to path
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'src'))
+PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, os.path.join(PROJECT_ROOT, 'src'))
 
 from experiments.comprehensive_runner import run_comprehensive_experiment
 from utils.device import get_device, is_gpu_available

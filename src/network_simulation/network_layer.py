@@ -135,8 +135,7 @@ class NetworkSimulator:
         )
 
         if success:
-            # Simulate actual delay
-            time.sleep(latency / 1000.0)  # Convert ms to seconds
+            # Latency is tracked as a metric; no real sleep in simulation code
             return latency, True, model_parameters
         else:
             # Packet lost - parameters not received

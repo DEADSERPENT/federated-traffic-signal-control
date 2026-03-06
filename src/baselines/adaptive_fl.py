@@ -23,6 +23,49 @@ from utils.device import get_device, is_gpu_available
 from federated_learning.aggregation import robust_aggregate, AggregationStrategy
 
 
+def compute_heuristic_green(features: np.ndarray) -> float:
+    """
+    Queue-clearing heuristic for optimal green duration.
+    Shared by AdaptiveFLController and CentralizedMLController so the
+    0.45 ML / 0.55 heuristic blend is identical in both controllers.
+
+    Args:
+        features: [N_queue, S_queue, E_queue, W_queue, phase_enc, green_norm]
+
+    Returns:
+        Heuristic green duration in seconds (not yet clipped).
+    """
+    north_q, south_q, east_q, west_q = features[0], features[1], features[2], features[3]
+    phase = features[4]
+    ns_q = north_q + south_q
+    ew_q = east_q + west_q
+    total_q = ns_q + ew_q + 0.1
+
+    active_q  = ns_q if phase > 0.5 else ew_q
+    waiting_q = ew_q if phase > 0.5 else ns_q
+
+    clear_rate = 3.0
+
+    if total_q < 3:
+        return 10.0
+    if active_q < 1:
+        return 10.0
+    if waiting_q < 1:
+        return min(active_q / clear_rate + 3, 30.0)
+
+    queue_ratio  = active_q / (active_q + waiting_q + 0.1)
+    base_cycle   = 30 if total_q < 15 else (40 if total_q < 30 else 50)
+    eff_ratio    = 0.30 + 0.40 * queue_ratio
+    optimal      = base_cycle * eff_ratio
+
+    if waiting_q > active_q * 1.5:
+        optimal = min(optimal, active_q / clear_rate + 5)
+    if active_q > waiting_q * 2.0:
+        optimal = max(optimal, (active_q / clear_rate) * 0.6)
+
+    return optimal
+
+
 class AdaptiveFLController:
     """
     SUPERIOR Federated Learning-based traffic signal controller.
@@ -277,110 +320,31 @@ class AdaptiveFLController:
 
     def get_green_duration(self, features: np.ndarray) -> float:
         """
-        ULTIMATE green duration prediction - FL beats ALL baselines including Actuated.
-
-        WINNING STRATEGY (Optimized for minimum wait time):
-        1. Global model trained on ALL intersections (FedProx prevents drift)
-        2. Aggressive queue-clearing with minimal switching delay
-        3. Webster's formula optimized for FL
-        4. Dynamic adaptation based on real-time queue state
-        5. Faster phase switching when queues are imbalanced
+        Predict optimal green duration using the FL global model blended with
+        the queue-clearing heuristic (0.45 ML + 0.55 heuristic).
 
         Args:
-            features: [north_queue, south_queue, east_queue, west_queue, phase, normalized_green]
+            features: [N_queue, S_queue, E_queue, W_queue, phase_enc, green_norm]
 
         Returns:
-            Optimal green duration that MINIMIZES waiting time
+            Green duration in seconds, clipped to [10, 40].
         """
         if not self.is_trained:
-            return 20.0  # Shorter default for faster response
+            return 20.0
 
-        # Get ML prediction (trained on global knowledge with FedProx)
-        prediction = self.global_model.predict(features)
-        ml_duration = float(prediction[0])
+        ml_duration  = float(self.global_model.predict(features)[0])
+        optimal      = compute_heuristic_green(features)
+        final        = 0.45 * ml_duration + 0.55 * optimal
 
-        # Extract queue information
-        north_queue = features[0]
-        south_queue = features[1]
-        east_queue = features[2]
-        west_queue = features[3]
-        current_phase = features[4]
+        # Fine-tune: respond quickly to heavy waiting queues / light traffic
+        waiting_q = features[3 if features[4] > 0.5 else 2] + features[2 if features[4] > 0.5 else 3]
+        total_q   = sum(features[:4]) + 0.1
+        if waiting_q > 10:
+            final = min(final, 20)
+        if total_q < 8:
+            final = min(final, 15)
 
-        ns_queue = north_queue + south_queue
-        ew_queue = east_queue + west_queue
-        total_queue = ns_queue + ew_queue + 0.1
-
-        # Determine active/waiting queues
-        if current_phase > 0.5:  # NS phase active
-            active_queue = ns_queue
-            waiting_queue = ew_queue
-        else:  # EW phase active
-            active_queue = ew_queue
-            waiting_queue = ns_queue
-
-        # ===== OPTIMIZED FL CONTROL STRATEGY (Beat Actuated) =====
-
-        # Vehicle clearing rate (calibrated for faster clearing)
-        CLEAR_RATE = 3.0  # More aggressive clearing
-
-        # Time to clear queues
-        time_to_clear_active = active_queue / CLEAR_RATE
-
-        # STRATEGY: Minimize total delay - be MORE responsive than Actuated
-
-        # Calculate optimal green time based on queue ratio
-        if total_queue < 3:
-            # Very low traffic - minimum green, switch fast
-            optimal_duration = 10
-        elif active_queue < 1:
-            # Current queue empty - switch immediately
-            optimal_duration = 10
-        elif waiting_queue < 1:
-            # No one waiting - clear but don't over-extend
-            optimal_duration = min(time_to_clear_active + 3, 30)
-        else:
-            # Proportional allocation based on queue sizes
-            queue_ratio = active_queue / (active_queue + waiting_queue + 0.1)
-
-            # SHORTER cycles for lower wait times (key insight)
-            if total_queue < 15:
-                base_cycle = 30  # Very short cycle
-            elif total_queue < 30:
-                base_cycle = 40  # Short cycle
-            else:
-                base_cycle = 50  # Medium cycle (never go too long)
-
-            # Allocate green time proportionally
-            min_share = 0.30
-            max_share = 0.70
-            effective_ratio = min_share + (max_share - min_share) * queue_ratio
-
-            optimal_duration = base_cycle * effective_ratio
-
-            # AGGRESSIVE switching: if waiting queue is larger, cut short fast
-            if waiting_queue > active_queue * 1.5:
-                optimal_duration = min(optimal_duration, time_to_clear_active + 5)
-
-            # If active queue is larger, extend but not too much
-            if active_queue > waiting_queue * 2.0:
-                optimal_duration = max(optimal_duration, time_to_clear_active * 0.6)
-
-        # BLEND: Higher weight to optimal strategy for wait time
-        # ML captures patterns, but optimal strategy minimizes wait
-        final_duration = 0.45 * ml_duration + 0.55 * optimal_duration
-
-        # FINE-TUNING for minimum wait time
-        # Respond quickly to queue buildup
-        if waiting_queue > 10:
-            final_duration = min(final_duration, 20)
-
-        # Very responsive for low traffic
-        if total_queue < 8:
-            final_duration = min(final_duration, 15)
-
-        # Never let vehicles wait too long (max green = 40s for faster switching)
-        # Never too short (min green = 10s for safety)
-        return float(np.clip(final_duration, 10, 40))
+        return float(np.clip(final, 10, 40))
 
     def run_simulation(
         self,

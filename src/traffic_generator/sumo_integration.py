@@ -23,6 +23,7 @@ References:
 
 import os
 import sys
+import subprocess
 import numpy as np
 from pathlib import Path
 from typing import Dict, List, Tuple, Optional
@@ -171,8 +172,31 @@ def _write_sumo_network(output_dir: Path) -> Path:
     edges_xml.append('</edges>')
 
     # ── write net.xml ──
-    (output_dir / "nodes.xml").write_text("\n".join(nodes_xml), encoding="utf-8")
-    (output_dir / "edges.xml").write_text("\n".join(edges_xml), encoding="utf-8")
+    nodes_path = output_dir / "nodes.xml"
+    edges_path = output_dir / "edges.xml"
+    nodes_path.write_text("\n".join(nodes_xml), encoding="utf-8")
+    edges_path.write_text("\n".join(edges_xml), encoding="utf-8")
+
+    # ── compile nodes + edges → net.xml via netconvert ──
+    sumo_home = Path(_SUMO_HOME) if _SUMO_HOME else None
+    netconvert_bin = (
+        sumo_home / "bin" / ("netconvert.exe" if sys.platform == "win32" else "netconvert")
+        if sumo_home else Path("netconvert")
+    )
+    try:
+        subprocess.run(
+            [str(netconvert_bin),
+             "--node-files", str(nodes_path),
+             "--edge-files", str(edges_path),
+             "--output-file", str(net_path),
+             "--no-warnings"],
+            check=True, capture_output=True
+        )
+    except (subprocess.CalledProcessError, FileNotFoundError) as exc:
+        raise RuntimeError(
+            f"netconvert failed: {exc}. "
+            "Ensure SUMO_HOME is set and netconvert is accessible."
+        ) from exc
 
     # ── route file (Poisson demand scaled per intersection) ──
     rou_lines = ['<routes>',

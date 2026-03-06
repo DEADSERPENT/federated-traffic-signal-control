@@ -36,8 +36,9 @@ from datetime import datetime
 from typing import Dict, List, Tuple, Any
 
 # Add paths
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'src'))
-sys.path.insert(0, os.path.dirname(__file__))
+PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, os.path.join(PROJECT_ROOT, 'src'))
+sys.path.insert(0, PROJECT_ROOT)
 
 import numpy as np
 

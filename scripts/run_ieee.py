@@ -28,8 +28,9 @@ import warnings
 warnings.filterwarnings('ignore')
 
 # Add paths
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'src'))
-sys.path.insert(0, os.path.dirname(__file__))
+PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, os.path.join(PROJECT_ROOT, 'src'))
+sys.path.insert(0, PROJECT_ROOT)
 
 import numpy as np
 import matplotlib.pyplot as plt
@@ -474,74 +475,107 @@ def plot_network_stress_comparison(output_dir: Path):
     print(f"  Saved: ieee_network_stress.png/pdf")
 
 
-def run_ablation_study(output_dir: Path, num_intersections: int = 4) -> Dict:
-    """Run ablation study comparing different FL configurations."""
+def run_ablation_study(output_dir: Path, num_intersections: int = 4,
+                       num_seeds: int = 3) -> Dict:
+    """Run ablation study comparing different FL configurations.
+
+    Each configuration is evaluated across ``num_seeds`` independent seeds so
+    that the reported MAE values carry meaningful error bars rather than being
+    a single stochastic draw.
+    """
     print(f"\n{'='*70}")
-    print("  ABLATION STUDY")
+    print(f"  ABLATION STUDY  ({num_seeds} seeds per config)")
     print(f"{'='*70}\n")
 
-    ablation_results = {}
-    seed = 42
+    ablation_seeds = [42, 123, 456, 789, 1024][:num_seeds]
 
     configs = [
-        {"name": "FL-Small", "hidden": [64, 32], "epochs": 5, "rounds": 30},
-        {"name": "FL-Medium", "hidden": [128, 64, 32], "epochs": 10, "rounds": 30},
-        {"name": "FL-Large (Ours)", "hidden": [256, 128, 64, 32], "epochs": 15, "rounds": 50},
-        {"name": "FL-NoScheduler", "hidden": [256, 128, 64, 32], "epochs": 15, "rounds": 50, "lr_decay": 1.0},
+        {"name": "FL-Small",       "hidden": [64, 32],           "epochs": 5,  "rounds": 30},
+        {"name": "FL-Medium",      "hidden": [128, 64, 32],      "epochs": 10, "rounds": 30},
+        {"name": "FL-Large (Ours)","hidden": [256, 128, 64, 32], "epochs": 15, "rounds": 50},
+        {"name": "FL-NoScheduler", "hidden": [256, 128, 64, 32], "epochs": 15, "rounds": 50,
+         "lr_decay": 1.0},
     ]
 
+    ablation_results = {}
+
     for config in configs:
-        print(f"\n--- Testing: {config['name']} ---")
-        set_global_seed(seed)
+        print(f"\n--- Config: {config['name']} ({num_seeds} seeds) ---")
+        seed_maes      = []
+        seed_waits     = []
+        seed_best_maes = []
 
-        generator = _make_generator(num_intersections, seed)
+        for seed in ablation_seeds:
+            set_global_seed(seed)
+            generator = _make_generator(num_intersections, seed)
 
-        fl_controller = AdaptiveFLController(
-            num_intersections=num_intersections,
-            num_rounds=config.get("rounds", 50),
-            local_epochs=config.get("epochs", 10),
-            hidden_layers=config.get("hidden", [128, 64, 32]),
-            learning_rate=0.002,
-            lr_decay=config.get("lr_decay", 0.99),
-            weight_decay=5e-5
-        )
+            fl_controller = AdaptiveFLController(
+                num_intersections=num_intersections,
+                num_rounds=config.get("rounds", 50),
+                local_epochs=config.get("epochs", 10),
+                hidden_layers=config.get("hidden", [128, 64, 32]),
+                learning_rate=0.002,
+                lr_decay=config.get("lr_decay", 0.99),
+                weight_decay=5e-5
+            )
 
-        fl_results = fl_controller.run_simulation(
-            generator.intersections, generator, duration=1800
-        )
+            fl_results = fl_controller.run_simulation(
+                generator.intersections, generator, duration=1800
+            )
+
+            seed_maes.append(fl_results["mae"])
+            seed_waits.append(fl_results["avg_waiting_time"])
+            seed_best_maes.append(fl_controller.best_mae)
+            print(f"  seed={seed}: Wait={fl_results['avg_waiting_time']:.2f}s, "
+                  f"MAE={fl_results['mae']:.4f}")
+
+        mae_mean = float(np.mean(seed_maes))
+        mae_std  = float(np.std(seed_maes))
+        print(f"  → {config['name']}: MAE = {mae_mean:.4f} ± {mae_std:.4f}")
 
         ablation_results[config["name"]] = {
-            "wait_time": fl_results["avg_waiting_time"],
-            "mae": fl_results["mae"],
-            "best_mae": fl_controller.best_mae,
-            "config": config
+            "mae_mean":       mae_mean,
+            "mae_std":        mae_std,
+            "wait_mean":      float(np.mean(seed_waits)),
+            "wait_std":       float(np.std(seed_waits)),
+            "best_mae_mean":  float(np.mean(seed_best_maes)),
+            # keep raw lists for downstream analysis
+            "mae_per_seed":   seed_maes,
+            "wait_per_seed":  seed_waits,
+            "config":         config,
         }
 
-        print(f"  Wait: {fl_results['avg_waiting_time']:.2f}s, MAE: {fl_results['mae']:.4f}")
-
-    # Plot ablation results
+    # Plot ablation results with error bars
     plt.style.use('seaborn-v0_8-whitegrid')
     fig, ax = plt.subplots(figsize=(10, 6))
 
-    names = list(ablation_results.keys())
-    maes = [ablation_results[n]["mae"] for n in names]
-    colors = ['#95a5a6', '#3498db', '#e74c3c', '#9b59b6']
+    names    = list(ablation_results.keys())
+    mae_means = [ablation_results[n]["mae_mean"] for n in names]
+    mae_stds  = [ablation_results[n]["mae_std"]  for n in names]
+    colors   = ['#95a5a6', '#3498db', '#e74c3c', '#9b59b6']
 
-    bars = ax.bar(names, maes, color=colors, edgecolor='black', linewidth=1.2, alpha=0.85)
+    bars = ax.bar(names, mae_means, yerr=mae_stds, capsize=6,
+                  color=colors, edgecolor='black', linewidth=1.2, alpha=0.85,
+                  error_kw=dict(elinewidth=1.8, ecolor='black'))
 
-    # Highlight best
-    best_idx = np.argmin(maes)
+    # Highlight best (lowest mean MAE)
+    best_idx = int(np.argmin(mae_means))
     bars[best_idx].set_edgecolor('#27ae60')
     bars[best_idx].set_linewidth(3)
 
     ax.set_ylabel('Mean Absolute Error (MAE)', fontsize=12, fontweight='bold')
-    ax.set_title('Ablation Study: FL Configuration Impact', fontsize=14, fontweight='bold')
-    ax.set_ylim(0, max(maes) * 1.2)
+    ax.set_title(
+        f'Ablation Study: FL Configuration Impact ({num_seeds} seeds each)',
+        fontsize=14, fontweight='bold'
+    )
+    ax.set_ylim(0, max(m + s for m, s in zip(mae_means, mae_stds)) * 1.25)
 
-    # Add value labels
-    for bar, mae in zip(bars, maes):
-        ax.text(bar.get_x() + bar.get_width()/2, bar.get_height() + 0.02,
-                f'{mae:.4f}', ha='center', va='bottom', fontsize=11, fontweight='bold')
+    # Value labels above each bar (show mean ± std)
+    for bar, mean, std in zip(bars, mae_means, mae_stds):
+        ax.text(bar.get_x() + bar.get_width() / 2,
+                bar.get_height() + std + 0.03,
+                f'{mean:.4f}\n±{std:.4f}',
+                ha='center', va='bottom', fontsize=9, fontweight='bold')
 
     plt.xticks(rotation=15, ha='right')
     plt.tight_layout()
@@ -664,7 +698,10 @@ def main():
     parser.add_argument("--runs",          type=int,   default=5,    help="Number of experiment runs")
     parser.add_argument("--rounds",        type=int,   default=50,   help="FL rounds per run")
     parser.add_argument("--intersections", type=int,   default=4,    help="Number of intersections (4 or 9)")
-    parser.add_argument("--ablation",      action="store_true",       help="Run ablation study")
+    parser.add_argument("--ablation",       action="store_true",       help="Run ablation study")
+    parser.add_argument("--ablation-seeds", type=int, default=3,
+                        dest="ablation_seeds",
+                        help="Seeds per ablation config (default 3; use 5 for full rigor)")
     parser.add_argument("--output",        type=str,   default="results/ieee", help="Output directory")
     parser.add_argument("--device",        type=str,   choices=["auto", "cpu", "cuda", "mps"],
                         default="auto",   help="Device to use (auto-detect by default)")
@@ -721,7 +758,8 @@ def main():
     # Ablation study
     ablation_results = {}
     if args.ablation:
-        ablation_results = run_ablation_study(output_dir, args.intersections)
+        ablation_results = run_ablation_study(output_dir, args.intersections,
+                                               num_seeds=args.ablation_seeds)
 
     # Generate LaTeX table
     latex_table = generate_latex_table(stats, ablation_results)

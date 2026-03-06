@@ -15,5 +15,8 @@ pandas>=2.0.0
 # Visualization
 matplotlib>=3.8.0
 
+# Scientific computing
+scipy>=1.11.0
+
 # Utilities
 pyyaml>=6.0.0

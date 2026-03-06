@@ -33,6 +33,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from models.traffic_model import create_model, train_model, evaluate_model
 from utils.device import get_device, is_gpu_available
+from baselines.adaptive_fl import compute_heuristic_green
 
 
 class CentralizedMLController:
@@ -124,7 +125,8 @@ class CentralizedMLController:
     # ─── prediction ──────────────────────────────────────────────────────────
     def get_green_duration(self, features: np.ndarray) -> float:
         """
-        Predict optimal green duration using the centralized model.
+        Predict optimal green duration using the centralized model blended with
+        the shared queue-clearing heuristic (0.45 ML + 0.55 heuristic).
 
         Args:
             features: [N_queue, S_queue, E_queue, W_queue, phase, green_norm]
@@ -135,32 +137,9 @@ class CentralizedMLController:
         if not self.is_trained:
             return 20.0
 
-        prediction = self.model.predict(features)
-        ml_duration = float(prediction[0])
-
-        # Apply the same queue-clearing heuristic as AdaptiveFLController
-        north_q, south_q, east_q, west_q = features[0], features[1], features[2], features[3]
-        phase = features[4]
-        ns_q = north_q + south_q
-        ew_q = east_q + west_q
-        total_q = ns_q + ew_q + 0.1
-
-        active_q  = ns_q if phase > 0.5 else ew_q
-        waiting_q = ew_q if phase > 0.5 else ns_q
-
-        if total_q < 3:
-            optimal = 10.0
-        elif active_q < 1:
-            optimal = 10.0
-        else:
-            queue_ratio = active_q / (active_q + waiting_q + 0.1)
-            base_cycle  = 30 if total_q < 15 else (40 if total_q < 30 else 50)
-            effective   = 0.30 + 0.40 * queue_ratio
-            optimal     = base_cycle * effective
-            if waiting_q > active_q * 1.5:
-                optimal = min(optimal, active_q / 3.0 + 5)
-
-        final = 0.45 * ml_duration + 0.55 * optimal
+        ml_duration = float(self.model.predict(features)[0])
+        optimal     = compute_heuristic_green(features)
+        final       = 0.45 * ml_duration + 0.55 * optimal
         return float(np.clip(final, 10, 40))
 
     # ─── evaluation ──────────────────────────────────────────────────────────

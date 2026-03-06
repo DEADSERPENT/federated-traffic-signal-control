@@ -1,0 +1,105 @@
+{
+  "timestamp": "20260305_194427",
+  "config": {
+    "train_rounds": 5,
+    "sim_steps": 60,
+    "seed": 42,
+    "no_gui": true,
+    "rebuild": false
+  },
+  "fl_training": [
+    {
+      "round": 1,
+      "avg_local_loss": 6.46012348598904,
+      "global_mse": 74.16690190633138,
+      "global_mae": 7.895039717356364,
+      "learning_rate": 0.002
+    },
+    {
+      "round": 2,
+      "avg_local_loss": 1.7278596485654514,
+      "global_mse": 15.186838467915853,
+      "global_mae": 2.768801662656996,
+      "learning_rate": 0.00198
+    },
+    {
+      "round": 3,
+      "avg_local_loss": 0.681188895056645,
+      "global_mse": 0.9125862452718947,
+      "global_mae": 0.4961005283726586,
+      "learning_rate": 0.0019602
+    },
+    {
+      "round": 4,
+      "avg_local_loss": 0.5873709714247121,
+      "global_mse": 0.29563938246832955,
+      "global_mae": 0.30690689550505745,
+      "learning_rate": 0.001940598
+    },
+    {
+      "round": 5,
+      "avg_local_loss": 0.5227419684330622,
+      "global_mse": 0.24599294281668133,
+      "global_mae": 0.30597682462798226,
+      "learning_rate": 0.0019211920199999999
+    }
+  ],
+  "sumo_simulation": {
+    "total_steps": 60,
+    "per_step_sample": [
+      {
+        "sim_time": 0,
+        "intersections": {
+          "A1": {
+            "queue": 0,
+            "wait": 0.0
+          },
+          "B0": {
+            "queue": 0,
+            "wait": 0.0
+          },
+          "B1": {
+            "queue": 2,
+            "wait": 0.0
+          },
+          "B2": {
+            "queue": 0,
+            "wait": 0.0
+          },
+          "C1": {
+            "queue": 0,
+            "wait": 0.0
+          }
+        }
+      },
+      {
+        "sim_time": 50,
+        "intersections": {
+          "A1": {
+            "queue": 3,
+            "wait": 4.75
+          },
+          "B0": {
+            "queue": 1,
+            "wait": 1.333
+          },
+          "B1": {
+            "queue": 5,
+            "wait": 0.6
+          },
+          "B2": {
+            "queue": 0,
+            "wait": 0.0
+          },
+          "C1": {
+            "queue": 0,
+            "wait": 0.0
+          }
+        }
+      }
+    ],
+    "mean_wait_s": 0.4923,
+    "median_wait_s": 0.0,
+    "max_wait_s": 7.0
+  }
+}

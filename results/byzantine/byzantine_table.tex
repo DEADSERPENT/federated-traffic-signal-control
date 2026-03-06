@@ -1,0 +1,16 @@
+\begin{table}[htbp]
+\centering
+\caption{Byzantine Robustness: MAE (mean $\pm$ std) under sensor-noise attacks. Bold = best per column.}
+\label{tab:byzantine}
+\begin{tabular}{lccc}
+\toprule
+\textbf{Aggregation} & \textbf{0 Byz.} & \textbf{1 Byz.} & \textbf{2 Byz.} \\
+\midrule
+FedAvg & 1.9273 $\pm$ 0.2697 & inf $\pm$ nan & inf $\pm$ nan \\
+Quality-Aware (Ours) & 1.9273 $\pm$ 0.2697 & inf $\pm$ nan & inf $\pm$ nan \\
+Trimmed Mean & 1.9154 $\pm$ 0.2664 & \textbf{2.8899 $\pm$ 0.6142} & inf $\pm$ nan \\
+Median & \textbf{1.9108 $\pm$ 0.2195} & 3.0864 $\pm$ 0.6943 & 5.6659 $\pm$ 1.8820 \\
+Multi-Krum & 1.9281 $\pm$ 0.2665 & 2.9348 $\pm$ 0.8185 & \textbf{4.5478 $\pm$ 2.7129} \\
+\bottomrule
+\end{tabular}
+\end{table}

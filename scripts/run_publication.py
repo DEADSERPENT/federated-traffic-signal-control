@@ -25,7 +25,8 @@ from pathlib import Path
 from datetime import datetime
 
 # Add src to path
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'src'))
+PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, os.path.join(PROJECT_ROOT, 'src'))
 
 from utils.reproducibility import set_global_seed, ExperimentLogger
 from utils.metrics import compare_methods, calculate_convergence_metrics

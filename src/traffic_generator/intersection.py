@@ -4,6 +4,7 @@ Simulates a single traffic intersection with multiple lanes and signals.
 """
 
 import numpy as np
+from collections import deque
 from dataclasses import dataclass, field
 from typing import List, Dict
 from enum import Enum
@@ -22,7 +23,7 @@ class Lane:
     lane_id: str
     direction: str  # "north", "south", "east", "west"
     queue_length: int = 0
-    vehicles_waiting: List[float] = field(default_factory=list)  # arrival times
+    vehicles_waiting: deque = field(default_factory=deque)  # arrival times (FIFO)
     total_vehicles_passed: int = 0
     total_waiting_time: float = 0.0
 
@@ -36,7 +37,7 @@ class Lane:
         vehicles_to_remove = min(count, self.queue_length)
         for _ in range(vehicles_to_remove):
             if self.vehicles_waiting:
-                arrival_time = self.vehicles_waiting.pop(0)
+                arrival_time = self.vehicles_waiting.popleft()  # O(1) vs list.pop(0) O(n)
                 self.total_waiting_time += (current_time - arrival_time)
                 self.total_vehicles_passed += 1
         self.queue_length = len(self.vehicles_waiting)
@@ -253,7 +254,7 @@ class Intersection:
         """Reset intersection to initial state."""
         for lane in self.lanes.values():
             lane.queue_length = 0
-            lane.vehicles_waiting = []
+            lane.vehicles_waiting = deque()
             lane.total_vehicles_passed = 0
             lane.total_waiting_time = 0.0
 

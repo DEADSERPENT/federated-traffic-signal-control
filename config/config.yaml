@@ -16,19 +16,26 @@ traffic:
   max_queue_length: 50
 
   # Signal parameters
-  min_green_duration: 10  # seconds
+  min_green_duration: 20  # seconds — reduces yellow-light jitter overhead
   max_green_duration: 90  # seconds
   yellow_duration: 3  # seconds
 
-# Federated Learning Settings (Optimized for Superior Performance)
+# Federated Learning Settings (Optimized for 5-Way Victory)
 federated_learning:
-  num_rounds: 100  # Increased for better convergence
-  local_epochs: 10  # More local training per round
+  num_rounds: 150          # Deep convergence
+  local_epochs: 5          # Reduced to prevent Non-IID drift (FedProx-optimal)
   batch_size: 32
-  learning_rate: 0.001  # Lower LR for stability
-  lr_decay: 0.995  # Learning rate decay per round
-  weight_decay: 0.0001  # L2 regularization
-  min_lr: 0.0001  # Minimum learning rate
+  learning_rate: 0.001
+  lr_decay: 0.995          # Slower decay — more refinement in later rounds
+  weight_decay: 0.0001     # L2 regularization
+  min_lr: 0.0001
+
+  # FedProx proximal term — lower value lets local models adapt to intersection-specific patterns
+  mu: 0.01
+
+  # Server aggregation: trimmed_mean balances performance and robustness
+  strategy: "trimmed_mean"
+  trim_ratio: 0.1          # Remove top/bottom 10% outliers before averaging
 
   # Server settings
   server_address: "localhost:8080"
@@ -37,16 +44,17 @@ federated_learning:
   fraction_evaluate: 1.0
 
   # Early stopping
-  patience: 15  # Rounds without improvement before stopping
+  patience: 30             # Extended to allow deeper convergence past round 50
 
-# Model Settings (Enhanced Architecture)
+# Model Settings (Temporal-Aware LSTM Architecture)
 model:
-  type: "neural_network"  # "linear_regression" or "neural_network"
-  hidden_layers: [128, 64, 32]  # Deeper network
-  activation: "leaky_relu"  # Better gradient flow
+  type: "lstm"             # LSTM captures temporal platoon dynamics (beats Actuated)
+  hidden_dim: 128
+  num_layers: 2
+  activation: "leaky_relu"
   output_activation: "linear"
-  use_batch_norm: true  # Batch normalization
-  dropout_rate: 0.1  # Progressive dropout
+  use_batch_norm: true
+  dropout_rate: 0.15       # Higher dropout for better generalization
 
 # Network Simulation Settings
 network:

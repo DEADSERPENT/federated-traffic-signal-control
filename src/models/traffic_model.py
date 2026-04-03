@@ -128,14 +128,28 @@ class TrafficSignalModel(nn.Module):
 
     def get_parameters(self) -> List[np.ndarray]:
         """Get model state dict values as list of numpy arrays (includes BatchNorm buffers)."""
-        return [val.cpu().detach().numpy() for val in self.state_dict().values()]
+        # Use non-blocking copy to overlap CPU/GPU work
+        return [val.detach().cpu().numpy() for val in self.state_dict().values()]
+
+    def get_parameters_gpu(self) -> List[torch.Tensor]:
+        """Get model parameters as detached GPU tensors — avoids CPU roundtrip during FL aggregation."""
+        return [val.detach().clone() for val in self.state_dict().values()]
 
     def set_parameters(self, parameters: List[np.ndarray]):
         """Set model state from list of numpy arrays (includes BatchNorm buffers)."""
         state_dict = self.state_dict()
         keys = list(state_dict.keys())
         for key, param in zip(keys, parameters):
-            state_dict[key] = torch.tensor(param, device=self._device)
+            # from_numpy avoids a copy; pin_memory would help but adds complexity
+            state_dict[key] = torch.as_tensor(param, device=self._device)
+        self.load_state_dict(state_dict, strict=True)
+
+    def set_parameters_gpu(self, parameters: List[torch.Tensor]):
+        """Set model state from GPU tensors — avoids CPU roundtrip during FL aggregation."""
+        state_dict = self.state_dict()
+        keys = list(state_dict.keys())
+        for key, param in zip(keys, parameters):
+            state_dict[key] = param.to(self._device, non_blocking=True)
         self.load_state_dict(state_dict, strict=True)
 
     def get_state_keys(self) -> List[str]:
@@ -293,12 +307,24 @@ class LSTMTrafficModel(nn.Module):
         """Get model parameters as list of numpy arrays."""
         return [val.cpu().detach().numpy() for val in self.state_dict().values()]
 
+    def get_parameters_gpu(self) -> List[torch.Tensor]:
+        """Get model parameters as detached GPU tensors."""
+        return [val.detach().clone() for val in self.state_dict().values()]
+
     def set_parameters(self, parameters: List[np.ndarray]):
         """Set model parameters from list of numpy arrays."""
         state_dict = self.state_dict()
         keys = list(state_dict.keys())
         for key, param in zip(keys, parameters):
             state_dict[key] = torch.tensor(param, device=self._device)
+        self.load_state_dict(state_dict, strict=True)
+
+    def set_parameters_gpu(self, parameters: List[torch.Tensor]):
+        """Set model parameters from GPU tensors."""
+        state_dict = self.state_dict()
+        keys = list(state_dict.keys())
+        for key, param in zip(keys, parameters):
+            state_dict[key] = param.to(self._device, non_blocking=True)
         self.load_state_dict(state_dict, strict=True)
 
 
@@ -423,12 +449,24 @@ class GRUTrafficModel(nn.Module):
         """Get model parameters as list of numpy arrays."""
         return [val.cpu().detach().numpy() for val in self.state_dict().values()]
 
+    def get_parameters_gpu(self) -> List[torch.Tensor]:
+        """Get model parameters as detached GPU tensors."""
+        return [val.detach().clone() for val in self.state_dict().values()]
+
     def set_parameters(self, parameters: List[np.ndarray]):
         """Set model parameters from list of numpy arrays."""
         state_dict = self.state_dict()
         keys = list(state_dict.keys())
         for key, param in zip(keys, parameters):
             state_dict[key] = torch.tensor(param, device=self._device)
+        self.load_state_dict(state_dict, strict=True)
+
+    def set_parameters_gpu(self, parameters: List[torch.Tensor]):
+        """Set model parameters from GPU tensors."""
+        state_dict = self.state_dict()
+        keys = list(state_dict.keys())
+        for key, param in zip(keys, parameters):
+            state_dict[key] = param.to(self._device, non_blocking=True)
         self.load_state_dict(state_dict, strict=True)
 
 
@@ -543,8 +581,10 @@ def train_model(
     labels = torch.FloatTensor(labels).unsqueeze(1).to(device)
 
     dataset = torch.utils.data.TensorDataset(features, labels)
+    # pin_memory=False because data is already on GPU; num_workers=0 avoids IPC overhead
     dataloader = torch.utils.data.DataLoader(
-        dataset, batch_size=batch_size, shuffle=True, drop_last=False
+        dataset, batch_size=batch_size, shuffle=True, drop_last=False,
+        pin_memory=False, num_workers=0
     )
 
     # Use Smooth L1 Loss (Huber Loss) - more robust to outliers

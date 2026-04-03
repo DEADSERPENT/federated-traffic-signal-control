@@ -120,13 +120,18 @@ class TrafficDataGenerator:
 
     def _calculate_optimal_green(self, intersection: Intersection) -> float:
         """
-        Optimal green duration calculation optimized for MINIMUM WAITING TIME.
-        This trains the FL model to aggressively minimize vehicle waiting.
+        Optimal green duration label using actuated-control logic.
 
-        Key principles:
-        - Switch faster when waiting queue is building up
-        - Clear active queue efficiently but don't over-stay
-        - Prefer shorter cycles for better responsiveness
+        Labels are computed identically to the ActuatedController so that the
+        FL model learns to replicate — and, via cross-intersection knowledge,
+        improve upon — the reactive actuated baseline.
+
+        Algorithm (mirrors ActuatedController.get_green_duration exactly):
+          1. Start at min_green (10 s).
+          2. Extend by 0.6 s per vehicle above detection threshold (> 2).
+          3. Gap-out: cap at 15 s when waiting > 1.5 × active AND active < 5.
+          4. Starvation: cap proportionally when waiting > 15 vehicles.
+          5. Clip to [min_green, 50].
 
         Args:
             intersection: Intersection object
@@ -134,61 +139,40 @@ class TrafficDataGenerator:
         Returns:
             Optimal green duration in seconds
         """
-        # Get queue lengths for current green phase
         if intersection.current_phase == "north_south":
             active_queue = (intersection.lanes["north"].queue_length +
-                           intersection.lanes["south"].queue_length)
+                            intersection.lanes["south"].queue_length)
             waiting_queue = (intersection.lanes["east"].queue_length +
-                            intersection.lanes["west"].queue_length)
+                             intersection.lanes["west"].queue_length)
         else:
             active_queue = (intersection.lanes["east"].queue_length +
-                           intersection.lanes["west"].queue_length)
+                            intersection.lanes["west"].queue_length)
             waiting_queue = (intersection.lanes["north"].queue_length +
-                            intersection.lanes["south"].queue_length)
+                             intersection.lanes["south"].queue_length)
 
-        total_queue = active_queue + waiting_queue
-        min_green = intersection.min_green
-        max_green = min(intersection.max_green, 70)  # Cap at 70 for responsiveness
+        min_green = intersection.min_green  # 10 s
 
-        if total_queue == 0:
-            # No traffic - use minimum
-            optimal_green = min_green
-        else:
-            # Time to clear active queue (2 vehicles/sec throughput)
-            time_to_clear = active_queue / 2.0
+        # Step 1: start at minimum
+        optimal_green = float(min_green)
 
-            # WAITING TIME MINIMIZATION STRATEGY:
-            # The key insight is that waiting time accumulates faster when
-            # vehicles wait longer. Short, responsive cycles reduce total wait.
+        # Step 2: extend based on active queue (0.6 s / vehicle above threshold)
+        if active_queue > 2:
+            optimal_green += min(active_queue * 3.0 / 5.0, 40.0)
 
-            if waiting_queue > active_queue * 1.5 and waiting_queue > 5:
-                # Heavy imbalance: waiting vehicles are accumulating wait time fast
-                # Give just enough time to clear some of active, then switch
-                optimal_green = max(time_to_clear * 0.6, min_green)
-                optimal_green = min(optimal_green, 25)  # Cap to switch quickly
-            elif active_queue > waiting_queue * 1.5 and active_queue > 5:
-                # Active queue is heavy - clear it efficiently
-                optimal_green = time_to_clear + 3
-                optimal_green = min(optimal_green, 45)  # But don't over-stay
-            elif total_queue < 10:
-                # Light traffic - use short cycles for responsiveness
-                optimal_green = min_green + 5
-            else:
-                # Balanced traffic - proportional allocation
-                queue_ratio = active_queue / (total_queue + 1)
-                # Base: proportional to active queue's share
-                optimal_green = 15 + queue_ratio * 30
+        # Step 3: gap-out — yield quickly when cross-traffic is backed up
+        if waiting_queue > active_queue * 1.5 and active_queue < 5:
+            optimal_green = min(optimal_green, 15.0)
 
-                # Urgency penalty: high waiting queue = cut current phase shorter
-                if waiting_queue > 10:
-                    urgency = min(waiting_queue / 10, 2)
-                    optimal_green -= urgency * 5
+        # Step 4: starvation prevention
+        if waiting_queue > 15:
+            max_cap = 50.0 * (1.0 - waiting_queue / 50.0)
+            optimal_green = min(optimal_green, max(max_cap, float(min_green)))
 
-        # Minimal noise for stable learning
+        # Minimal noise for diverse training signal
         optimal_green += np.random.normal(0, 0.3)
 
-        # Clip to valid range with lower cap for faster response
-        optimal_green = np.clip(optimal_green, min_green, max_green)
+        # Clip to valid range (hard max 50, matching ActuatedController)
+        optimal_green = np.clip(optimal_green, min_green, 50)
 
         return float(optimal_green)
 

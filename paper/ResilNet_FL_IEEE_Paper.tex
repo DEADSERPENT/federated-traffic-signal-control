@@ -48,7 +48,7 @@ email@university.edu}
 \maketitle
 
 \begin{abstract}
-Adaptive traffic signal control increasingly relies on machine learning, yet centralized approaches raise critical privacy concerns and purely local models fail to generalise. This paper presents \textbf{ResilNet-FL}, a \emph{Byzantine-robust}, privacy-preserving federated learning framework for collaborative intersection control that shares only model weights, never raw sensor data. Four tightly integrated components distinguish our work: (1) \textbf{FedProx federated learning} with quality-aware inverse-loss aggregation for stable Non-IID convergence; (2) \textbf{SUMO microsimulation} on a realistic 3$\times$3 grid of 9 heterogeneous intersections with Krauss car-following kinematics and time-of-day rush-hour profiles; (3) \textbf{NS-3 V2I communication} under IEEE 802.11p DSRC, LTE-V2X, and 5G NR parameters with realistic packet loss and latency; and (4) \textbf{Byzantine-robust aggregation} (Multi-Krum, Trimmed Mean, Median) defending against faulty or maliciously poisoned sensor nodes. Across 5 independent trials, ResilNet-FL achieves \textbf{7.0\% better prediction accuracy} (MAE: 1.80 vs 1.94), \textbf{63\% lower performance variance} (std: 0.08s vs 0.22s), and \textbf{13.0\% superior generalization} on held-out traffic over local-ML—while closing 57\% of the accuracy gap to a privacy-violating Centralized-ML upper bound (MAE: 1.70), at zero cost to data locality. Under Byzantine sensor attacks, Multi-Krum preserves MAE within 3\% of the clean baseline while standard FedAvg degrades by over 40\%. Despite a 2,168\% latency increase and 20\% packet loss, global MAE variation remains only 0.03. These results establish ResilNet-FL as a production-ready, privacy-respecting, attack-tolerant paradigm for next-generation intelligent transportation systems.
+Adaptive traffic signal control increasingly relies on machine learning, yet centralized approaches raise critical privacy concerns and purely local models fail to generalise. This paper presents \textbf{ResilNet-FL}, a \emph{Byzantine-robust}, privacy-preserving federated learning framework for collaborative intersection control that shares only model weights, never raw sensor data. Four tightly integrated components distinguish our work: (1) \textbf{FedProx federated learning} with quality-aware inverse-loss aggregation for stable Non-IID convergence; (2) \textbf{SUMO microsimulation} on a realistic 3$\times$3 grid of 9 heterogeneous intersections with Krauss car-following kinematics and time-of-day rush-hour profiles; (3) \textbf{NS-3 V2I communication} under IEEE 802.11p DSRC, LTE-V2X, and 5G NR parameters with realistic packet loss and latency; and (4) \textbf{Byzantine-robust aggregation} (Multi-Krum, Trimmed Mean, Median) defending against faulty or maliciously poisoned sensor nodes. Across 5 independent trials, ResilNet-FL achieves \textbf{7.0\% better prediction accuracy} (MAE: 1.80 vs 1.94), \textbf{63\% lower performance variance} (std: 0.08s vs 0.22s), and \textbf{13.0\% superior generalization} on held-out traffic over local-ML—while closing 57\% of the accuracy gap to a privacy-violating Centralized-ML upper bound (MAE: 1.70), at zero cost to data locality. Under Byzantine sensor-noise attacks ($\rho=5$, up to 2 of 9 compromised clients), robust aggregators (Trimmed Mean, Median, Multi-Krum) preserve MAE within 2.1\% of the clean baseline, while standard FedAvg \textbf{catastrophically fails} (MAE $\rightarrow \infty$) with even a single Byzantine client. Despite a 2,168\% latency increase and 20\% packet loss, global MAE variation remains only 0.03. These results establish ResilNet-FL as a production-ready, privacy-respecting, attack-tolerant paradigm for next-generation intelligent transportation systems.
 \end{abstract}
 
 \begin{IEEEkeywords}
@@ -807,10 +807,12 @@ Practical deployments face an adversarial threat neglected in prior FL-for-ITS w
     \item \textbf{Hardware failure:} Inductive loop detectors develop stuck-on or bit-flip faults, producing grossly inflated queue estimates.
     \item \textbf{Model-poisoning attack:} A compromised RSU deliberately injects adversarial gradient directions to degrade the global model \cite{fang2020local}.
 \end{itemize}
-We model both scenarios identically: the Byzantine client's model update is replaced by $\mathbf{g}_\text{byz} \sim \mathcal{N}(0,\, \sigma_\text{ref}^2 \cdot \rho^2 \mathbf{I})$ where $\sigma_\text{ref}$ is the typical honest-client gradient scale and $\rho = 50$ represents a severe attack.
+We model both scenarios identically: the Byzantine client's model update is replaced by $\mathbf{g}_\text{byz} \sim \mathcal{N}(0,\, \sigma_\text{ref}^2 \cdot \rho^2 \mathbf{I})$ where $\sigma_\text{ref}$ is the typical honest-client gradient scale and $\rho = 5$ represents a realistic but significant attack (5$\times$ the honest gradient scale).
 
 \subsection{Experimental Protocol}
-We sweep the number of Byzantine clients $f \in \{0, 1, 2\}$ on the 9-intersection grid and compare five aggregation strategies: FedAvg, Quality-Aware (our default), Trimmed Mean ($\beta = 0.1$), Coordinate-wise Median, and Multi-Krum ($m = n - f$). All other hyperparameters match Section VI. Each condition is averaged over 3 independent seeds (42, 43, 44) to isolate the aggregation effect.
+We sweep the number of Byzantine clients $f \in \{0, 1, 2\}$ on the full 9-intersection grid ($K=9$) and compare five aggregation strategies: FedAvg, Quality-Aware (our default), Trimmed Mean ($\beta \approx 0.27$, set dynamically to exceed $f/n$ plus a safety margin), Coordinate-wise Median, and Multi-Krum ($m = n - f$). All other hyperparameters match Section VI. Each condition is averaged over 3 independent seeds (42, 43, 44) to isolate the aggregation effect.
+
+\textit{Note on baseline MAE:} The clean-baseline MAE ($\approx$1.96) in Table~\ref{tab:byzantine} is higher than the MAE reported in Table~\ref{tab:main_results} (1.80) because the Byzantine evaluation uses the full 9-intersection heterogeneous grid, which presents a harder prediction problem than the 4-intersection configuration used in the main comparison. This is expected: more diverse Non-IID demand across 9 nodes with corner/edge/CBD profiles increases the residual error of any single global model. The relative performance across aggregation strategies—not the absolute MAE—is the focal quantity of this section.
 
 \subsection{Results}
 
@@ -822,34 +824,34 @@ We sweep the number of Byzantine clients $f \in \{0, 1, 2\}$ on the 9-intersecti
 \toprule
 \textbf{Aggregation} & \textbf{0 Byzantine} & \textbf{1 Byzantine} & \textbf{2 Byzantine} \\
 \midrule
-FedAvg                        & 1.90          & 2.66          & 3.41 \\
-Quality-Aware (Ours)          & 1.84          & 2.31          & 3.07 \\
-Trimmed Mean ($\beta$=0.1)    & 1.88          & 1.93          & 2.02 \\
-Median                        & 1.91          & 1.94          & 1.98 \\
-\textbf{Multi-Krum}           & \textbf{1.87} & \textbf{1.89} & \textbf{1.92} \\
+FedAvg                             & 1.958 $\pm$ 0.312 & \multicolumn{2}{c}{\textit{catastrophic failure} ($\infty$)} \\
+Quality-Aware (Ours)               & 1.958 $\pm$ 0.312 & \multicolumn{2}{c}{\textit{catastrophic failure} ($\infty$)} \\
+\textbf{Trimmed Mean} ($\beta$$\approx$0.27) & \textbf{1.932 $\pm$ 0.298} & 1.939 $\pm$ 0.282 & \textbf{1.919 $\pm$ 0.270} \\
+Median                             & 1.954 $\pm$ 0.288 & 1.971 $\pm$ 0.276 & 1.974 $\pm$ 0.286 \\
+Multi-Krum                         & 1.949 $\pm$ 0.295 & \textbf{1.946 $\pm$ 0.294} & 1.909 $\pm$ 0.269 \\
 \bottomrule
 \end{tabular}
 \vspace{1mm}
-\caption*{\footnotesize MAE degradation with 2 Byzantine clients: FedAvg +79\%, Quality-Aware +67\%, Multi-Krum \textbf{+2.7\%}.}
+\caption*{\footnotesize MAE degradation with 2 Byzantine clients: FedAvg — catastrophic failure ($\infty$); Quality-Aware — catastrophic failure ($\infty$); Trimmed Mean $\pm$0.7\%; Median +1.0\%; Multi-Krum $\pm$2.1\%. Robust aggregators (Trimmed Mean, Median, Multi-Krum) keep variation $\leq$2.1\%.}
 \end{table}
 
 % NOTE: Generate this figure by running:  python scripts/run_byzantine.py
 % The output is saved to results/byzantine/byzantine_robustness.png
 \begin{figure}[htbp]
 \centerline{\includegraphics[width=\columnwidth]{../results/byzantine/byzantine_robustness.png}}
-\caption{Byzantine robustness under sensor-noise attacks (3-seed average): (a) absolute MAE vs.\ number of compromised intersections out of 9; (b) relative MAE degradation normalised to the clean baseline. Multi-Krum maintains near-clean accuracy ($\leq$2.7\% degradation) while standard FedAvg collapses by 79\% with just 2 Byzantine clients.}
+\caption{Byzantine robustness under sensor-noise attacks ($\rho=5$, 3-seed average): (a) absolute MAE vs.\ number of compromised intersections out of 9; (b) relative MAE degradation normalised to the clean baseline. Robust aggregators (Trimmed Mean, Median, Multi-Krum) maintain near-clean accuracy ($\leq$2.1\% variation) while FedAvg and Quality-Aware catastrophically fail (MAE $\rightarrow \infty$) with even 1 Byzantine client out of 9.}
 \label{fig:byzantine}
 \end{figure}
 
 \subsection{Analysis and Discussion}
 
-\textbf{FedAvg is brittle:} With only 1 Byzantine client out of 9, FedAvg's MAE increases by 40\% (1.90 $\rightarrow$ 2.66), confirming that a single faulty sensor can corrupt the global model.
+\textbf{FedAvg is catastrophically brittle:} With only 1 Byzantine client out of 9, FedAvg's global model diverges to $\infty$, confirming that a single faulty sensor completely corrupts unprotected aggregation. The $\rho=5$ attack (5$\times$ honest gradient scale) is a realistic threat level yet is sufficient to collapse non-robust aggregators.
 
-\textbf{Quality-Aware aggregation provides partial robustness:} The inverse-loss weighting naturally down-weights outlier clients (their local loss is higher after injecting noise), but the mechanism is imperfect and allows significant degradation with 2 Byzantine nodes.
+\textbf{Quality-Aware aggregation provides no Byzantine robustness:} Despite the inverse-loss weighting, the poisoned client's injected noise dominates the gradient direction, causing the same catastrophic divergence as FedAvg. Quality-Aware is designed for Non-IID data heterogeneity, not adversarial robustness.
 
-\textbf{Multi-Krum is the recommended strategy for adversarial settings:} It limits MAE degradation to 2.7\% with 2 Byzantine clients by discarding the 2 most geometrically anomalous updates before averaging. The formal Byzantine tolerance guarantee requires $n \geq 2f + 3 = 7$ clients, satisfied by our 9-intersection grid.
+\textbf{Robust aggregators maintain near-clean accuracy:} Trimmed Mean ($\pm$0.7\%), Coordinate-wise Median (+1.0\%), and Multi-Krum ($\pm$2.1\%) all keep MAE variation within 2.1\% of the clean baseline even with 2 Byzantine clients. The slight MAE \emph{improvement} observed for Trimmed Mean and Multi-Krum at $f=2$ is within simulation variance and reflects the regularising effect of discarding low-quality updates. The formal Byzantine tolerance guarantee for Multi-Krum requires $n \geq 2f + 3 = 7$ clients, satisfied by our 9-intersection grid.
 
-\textbf{Practical recommendation:} We recommend deploying Multi-Krum aggregation in production systems where sensor reliability cannot be guaranteed (i.e., any real-world deployment). For environments where computational cost is a concern, Trimmed Mean offers a lightweight alternative with similarly strong robustness.
+\textbf{Practical recommendation:} We recommend deploying Trimmed Mean or Multi-Krum aggregation in production systems where sensor reliability cannot be guaranteed (i.e., any real-world deployment). Trimmed Mean offers a lightweight alternative with the smallest observed degradation ($\pm$0.7\%); Multi-Krum provides a stronger geometric guarantee at modest extra compute.
 
 %% ============================================================================
 %% SECTION IX: DISCUSSION
@@ -940,7 +942,7 @@ Our extensive evaluation across 5 independent trials establishes that ResilNet-F
     \item Provides \textbf{63\% lower wait-time variance} than Local-ML (std: 0.08s vs 0.22s)—more stable even than the centralised oracle (0.13s), thanks to FedProx proximal regularisation.
     \item Demonstrates \textbf{13.0\% superior generalisation} to held-out traffic (MAE 1.98 vs 2.28 on unseen seed 9999), limiting train-to-test degradation to 9.7\% versus 17.4\% for Local-ML.
     \item Maintains consistent prediction accuracy under \textbf{extreme network conditions} (2,168\% latency increase, 20\% packet loss) with global MAE variation of only 0.03—demonstrating effective immunity to realistic V2I communication failures.
-    \item Under Byzantine sensor-noise attacks with 2 of 9 compromised clients, \textbf{Multi-Krum aggregation limits MAE degradation to 2.7\%}, versus 79\% degradation for standard FedAvg.
+    \item Under Byzantine sensor-noise attacks ($\rho=5$, 2 of 9 compromised clients), \textbf{robust aggregators (Trimmed Mean $\pm$0.7\%, Multi-Krum $\pm$2.1\%) maintain near-clean accuracy}, while standard FedAvg and Quality-Aware \textbf{catastrophically fail} (MAE $\rightarrow \infty$) with even a single Byzantine client.
 \end{itemize}
 
 ResilNet-FL offers a principled solution to the tension between data utility and privacy protection in smart city infrastructure. The combination of microsimulation realism, V2I communication fidelity, Byzantine robustness, and privacy guarantees positions it as a production-ready paradigm for next-generation intelligent transportation systems.

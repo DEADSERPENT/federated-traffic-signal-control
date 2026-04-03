@@ -1,0 +1,373 @@
+Microsoft Windows [Version 10.0.26200.7922]
+(c) Microsoft Corporation. All rights reserved.
+
+C:\Users\AKSHAY\Music\TRAFFIC SIGNALS>"C:/Users/AKSHAY/Music/TRAFFIC SIGNALS/venv/Scripts/activate.bat"
+
+(venv) C:\Users\AKSHAY\Music\TRAFFIC SIGNALS>"c:\Users\AKSHAY\Music\TRAFFIC SIGNALS\venv\Scripts\activate.bat"
+
+(venv) C:\Users\AKSHAY\Music\TRAFFIC SIGNALS> python scripts/run_ieee.py --runs 5 --intersections 4 
+[Device] Using CUDA GPU: NVIDIA GeForce RTX 3050 Laptop GPU (4.0 GB)
+
+======================================================================
+  IEEE-READY EXPERIMENTAL EVALUATION
+  FL Traffic Signal Control with NS-3 Integration
+  Device        : cuda (GPU)
+  Intersections : 4
+======================================================================
+
+======================================================================
+  RUNNING 5 EXPERIMENTS FOR STATISTICAL ANALYSIS
+  Intersections: 4
+======================================================================
+
+
+--- Experiment 1/5 (seed=42) ---
+[Reproducibility] Global seed set to 42 (device: cuda)
+[Reproducibility] Global seed set to 42 (device: cuda)
+[Reproducibility] Global seed set to 42 (device: cuda)
+[Reproducibility] Global seed set to 42 (device: cuda)
+[Reproducibility] Global seed set to 42 (device: cuda)
+[Reproducibility] Global seed set to 42 (device: cuda)
+
+Training Local ML Models...
+  Device: cuda (GPU)
+  Training Local Model for Intersection 0...
+    Initial Loss: 8.6886
+    Final Loss: 1.9155
+  Training Local Model for Intersection 1...
+    Initial Loss: 12.1621
+    Final Loss: 3.9354
+  Training Local Model for Intersection 2...
+    Initial Loss: 9.5524
+    Final Loss: 2.9888
+  Training Local Model for Intersection 3...
+    Initial Loss: 8.7085
+    Final Loss: 2.5658
+[Reproducibility] Global seed set to 42 (device: cuda)
+
+Training Centralized-ML (pooled data from 4 intersections)...
+  Device: cuda (GPU)
+  Architecture: [256, 128, 64, 32]
+  Total pooled samples: 4,000  (= 4 × 1000)
+  Initial loss: 11.6270
+  Final loss:   2.5059
+[Reproducibility] Global seed set to 42 (device: cuda)
+
+Starting Enhanced Federated Learning (50 rounds)...
+  Device: cuda (GPU)
+  Architecture: [256, 128, 64, 32]
+  Initial LR: 0.002, Decay: 0.99
+  FedProx: Enabled (mu=0.05)
+  Aggregation: quality_aware
+  Round 1: MSE=51.4354, MAE=3.9179, LR=0.002000
+  Round 10: MSE=39.4960, MAE=3.1092, LR=0.001827
+  Round 20: MSE=42.3765, MAE=3.1624, LR=0.001652
+  Round 30: MSE=41.2156, MAE=3.0881, LR=0.001494
+  Round 40: MSE=41.3242, MAE=3.1390, LR=0.001351
+  Early stopping at round 40 (no improvement for 15 rounds)
+  Restored best model with MAE: 3.0355
+  Fixed-Time:    Wait=13.35s
+  Actuated:      Wait=8.77s
+  Local-ML:      Wait=9.12s, MAE=2.7296
+  Centralized:   Wait=9.25s, MAE=2.4516
+  FL (Ours):     Wait=9.57s, MAE=2.6252
+
+--- Experiment 2/5 (seed=123) ---
+[Reproducibility] Global seed set to 123 (device: cuda)
+[Reproducibility] Global seed set to 123 (device: cuda)
+[Reproducibility] Global seed set to 123 (device: cuda)
+[Reproducibility] Global seed set to 123 (device: cuda)
+[Reproducibility] Global seed set to 123 (device: cuda)
+[Reproducibility] Global seed set to 123 (device: cuda)
+
+Training Local ML Models...
+  Device: cuda (GPU)
+  Training Local Model for Intersection 0...
+    Initial Loss: 9.7014
+    Final Loss: 2.7820
+  Training Local Model for Intersection 1...
+    Initial Loss: 7.7992
+    Final Loss: 1.6854
+  Training Local Model for Intersection 2...
+    Initial Loss: 7.6903
+    Final Loss: 1.4442
+  Training Local Model for Intersection 3...
+    Initial Loss: 9.3266
+    Final Loss: 2.4122
+[Reproducibility] Global seed set to 123 (device: cuda)
+
+Training Centralized-ML (pooled data from 4 intersections)...
+  Device: cuda (GPU)
+  Architecture: [256, 128, 64, 32]
+  Total pooled samples: 4,000  (= 4 × 1000)
+  Initial loss: 11.1891
+  Final loss:   1.8377
+[Reproducibility] Global seed set to 123 (device: cuda)
+
+Starting Enhanced Federated Learning (50 rounds)...
+  Device: cuda (GPU)
+  Architecture: [256, 128, 64, 32]
+  Initial LR: 0.002, Decay: 0.99
+  FedProx: Enabled (mu=0.05)
+  Aggregation: quality_aware
+  Round 1: MSE=32.0378, MAE=3.0897, LR=0.002000
+  Round 10: MSE=16.5499, MAE=2.0500, LR=0.001827
+  Round 20: MSE=19.0380, MAE=2.1564, LR=0.001652
+  Round 30: MSE=17.8941, MAE=2.0739, LR=0.001494
+  Early stopping at round 31 (no improvement for 15 rounds)
+  Restored best model with MAE: 2.0222
+  Fixed-Time:    Wait=12.89s
+  Actuated:      Wait=8.25s
+  Local-ML:      Wait=8.70s, MAE=2.0211
+  Centralized:   Wait=9.16s, MAE=1.9370
+  FL (Ours):     Wait=9.40s, MAE=2.1201
+
+--- Experiment 3/5 (seed=456) ---
+[Reproducibility] Global seed set to 456 (device: cuda)
+[Reproducibility] Global seed set to 456 (device: cuda)
+[Reproducibility] Global seed set to 456 (device: cuda)
+[Reproducibility] Global seed set to 456 (device: cuda)
+[Reproducibility] Global seed set to 456 (device: cuda)
+[Reproducibility] Global seed set to 456 (device: cuda)
+
+Training Local ML Models...
+  Device: cuda (GPU)
+  Training Local Model for Intersection 0...
+    Initial Loss: 7.1563
+    Final Loss: 1.4633
+  Training Local Model for Intersection 1...
+    Initial Loss: 7.2805
+    Final Loss: 1.2965
+  Training Local Model for Intersection 2...
+    Initial Loss: 12.2603
+    Final Loss: 3.1327
+  Training Local Model for Intersection 3...
+    Initial Loss: 9.7873
+    Final Loss: 3.1481
+[Reproducibility] Global seed set to 456 (device: cuda)
+
+Training Centralized-ML (pooled data from 4 intersections)...
+  Device: cuda (GPU)
+  Architecture: [256, 128, 64, 32]
+  Total pooled samples: 4,000  (= 4 × 1000)
+  Initial loss: 10.8151
+  Final loss:   1.9980
+[Reproducibility] Global seed set to 456 (device: cuda)
+
+Starting Enhanced Federated Learning (50 rounds)...
+  Device: cuda (GPU)
+  Architecture: [256, 128, 64, 32]
+  Initial LR: 0.002, Decay: 0.99
+  FedProx: Enabled (mu=0.05)
+  Aggregation: quality_aware
+  Round 1: MSE=36.8624, MAE=3.0005, LR=0.002000
+  Round 10: MSE=20.8302, MAE=2.8294, LR=0.001827
+  Round 20: MSE=22.9593, MAE=2.8468, LR=0.001652
+  Round 30: MSE=25.4800, MAE=2.8987, LR=0.001494
+  Early stopping at round 31 (no improvement for 15 rounds)
+  Restored best model with MAE: 2.6587
+  Fixed-Time:    Wait=13.49s
+  Actuated:      Wait=8.78s
+  Local-ML:      Wait=8.99s, MAE=2.2939
+  Centralized:   Wait=9.18s, MAE=2.1477
+  FL (Ours):     Wait=9.43s, MAE=2.8603
+
+--- Experiment 4/5 (seed=789) ---
+[Reproducibility] Global seed set to 789 (device: cuda)
+[Reproducibility] Global seed set to 789 (device: cuda)
+[Reproducibility] Global seed set to 789 (device: cuda)
+[Reproducibility] Global seed set to 789 (device: cuda)
+[Reproducibility] Global seed set to 789 (device: cuda)
+[Reproducibility] Global seed set to 789 (device: cuda)
+
+Training Local ML Models...
+  Device: cuda (GPU)
+  Training Local Model for Intersection 0...
+    Initial Loss: 7.6055
+    Final Loss: 1.7182
+  Training Local Model for Intersection 1...
+    Initial Loss: 8.1129
+    Final Loss: 1.4885
+  Training Local Model for Intersection 2...
+    Initial Loss: 10.9679
+    Final Loss: 3.3830
+  Training Local Model for Intersection 3...
+    Initial Loss: 10.3040
+    Final Loss: 2.5661
+[Reproducibility] Global seed set to 789 (device: cuda)
+
+Training Centralized-ML (pooled data from 4 intersections)...
+  Device: cuda (GPU)
+  Architecture: [256, 128, 64, 32]
+  Total pooled samples: 4,000  (= 4 × 1000)
+  Initial loss: 10.5312
+  Final loss:   1.9808
+[Reproducibility] Global seed set to 789 (device: cuda)
+
+Starting Enhanced Federated Learning (50 rounds)...
+  Device: cuda (GPU)
+  Architecture: [256, 128, 64, 32]
+  Initial LR: 0.002, Decay: 0.99
+  FedProx: Enabled (mu=0.05)
+  Aggregation: quality_aware
+  Round 1: MSE=34.9616, MAE=3.1295, LR=0.002000
+  Round 10: MSE=22.4504, MAE=2.5544, LR=0.001827
+  Round 20: MSE=23.2145, MAE=2.5820, LR=0.001652
+  Round 30: MSE=23.9575, MAE=2.6027, LR=0.001494
+  Early stopping at round 31 (no improvement for 15 rounds)
+  Restored best model with MAE: 2.5225
+  Fixed-Time:    Wait=12.82s
+  Actuated:      Wait=8.46s
+  Local-ML:      Wait=9.00s, MAE=2.1520
+  Centralized:   Wait=9.02s, MAE=1.9799
+  FL (Ours):     Wait=9.38s, MAE=2.4972
+
+--- Experiment 5/5 (seed=1024) ---
+[Reproducibility] Global seed set to 1024 (device: cuda)
+[Reproducibility] Global seed set to 1024 (device: cuda)
+[Reproducibility] Global seed set to 1024 (device: cuda)
+[Reproducibility] Global seed set to 1024 (device: cuda)
+[Reproducibility] Global seed set to 1024 (device: cuda)
+[Reproducibility] Global seed set to 1024 (device: cuda)
+
+Training Local ML Models...
+  Device: cuda (GPU)
+  Training Local Model for Intersection 0...
+    Initial Loss: 11.0474
+    Final Loss: 2.7545
+  Training Local Model for Intersection 1...
+    Initial Loss: 12.5419
+    Final Loss: 3.9049
+  Training Local Model for Intersection 2...
+    Initial Loss: 9.2136
+    Final Loss: 2.3120
+  Training Local Model for Intersection 3...
+    Initial Loss: 10.2438
+    Final Loss: 2.7835
+[Reproducibility] Global seed set to 1024 (device: cuda)
+
+Training Centralized-ML (pooled data from 4 intersections)...
+  Device: cuda (GPU)
+  Architecture: [256, 128, 64, 32]
+  Total pooled samples: 4,000  (= 4 × 1000)
+  Initial loss: 13.0110
+  Final loss:   2.6656
+[Reproducibility] Global seed set to 1024 (device: cuda)
+
+Starting Enhanced Federated Learning (50 rounds)...
+  Device: cuda (GPU)
+  Architecture: [256, 128, 64, 32]
+  Initial LR: 0.002, Decay: 0.99
+  FedProx: Enabled (mu=0.05)
+  Aggregation: quality_aware
+  Round 1: MSE=58.1457, MAE=4.6728, LR=0.002000
+  Round 10: MSE=30.3693, MAE=2.6349, LR=0.001827
+  Round 20: MSE=29.4355, MAE=2.6084, LR=0.001652
+  Round 30: MSE=30.2752, MAE=2.6210, LR=0.001494
+  Early stopping at round 35 (no improvement for 15 rounds)
+  Restored best model with MAE: 2.6084
+  Fixed-Time:    Wait=13.58s
+  Actuated:      Wait=9.09s
+  Local-ML:      Wait=9.33s, MAE=2.8274
+  Centralized:   Wait=8.92s, MAE=2.6088
+  FL (Ours):     Wait=9.35s, MAE=2.7192
+
+======================================================================
+  STATISTICAL ANALYSIS
+======================================================================
+
+Method Comparison (mean ± std):
+------------------------------------------------------------------------------------------
+Method                 Wait Time              MAE                    Stability
+------------------------------------------------------------------------------------------
+Fixed-Time             13.23 ± 0.31s      N/A                    0.31s
+Actuated               8.67 ± 0.29s      N/A                    0.29s
+Local-ML               9.03 ± 0.20s      2.4048 ± 0.3186      0.20s
+Centralized-ML         9.11 ± 0.12s      2.2250 ± 0.2637        0.12s
+FL (Ours)              9.43 ± 0.08s      2.5644 ± 0.2518      0.08s
+
+======================================================================
+  GENERATING IEEE-QUALITY PLOTS
+======================================================================
+
+  Saved: ieee_method_comparison.png/pdf
+  Saved: ieee_fl_convergence.png/pdf
+  Saved: ieee_network_stress.png/pdf
+
+  Saved: latex_table.tex
+  Saved: ieee_results.json
+[Reproducibility] Global seed set to 1024 (device: cuda)
+[Reproducibility] Global seed set to 1024 (device: cuda)
+
+Starting Enhanced Federated Learning (50 rounds)...
+  Device: cuda (GPU)
+  Architecture: [256, 128, 64, 32]
+  Initial LR: 0.002, Decay: 0.99
+  FedProx: Enabled (mu=0.05)
+  Aggregation: quality_aware
+  Round 1: MSE=60.5121, MAE=4.7648, LR=0.002000
+  Round 10: MSE=29.9713, MAE=2.6324, LR=0.001827
+  Round 20: MSE=29.3920, MAE=2.5949, LR=0.001652
+  Round 30: MSE=30.2894, MAE=2.6522, LR=0.001494
+  Early stopping at round 35 (no improvement for 15 rounds)
+  Restored best model with MAE: 2.5949
+  Device: cuda (GPU)
+  Training Local Model for Intersection 0...
+    Initial Loss: 10.7053
+    Final Loss: 2.7427
+  Training Local Model for Intersection 1...
+    Initial Loss: 12.8898
+    Final Loss: 3.8572
+  Training Local Model for Intersection 2...
+    Initial Loss: 8.3291
+    Final Loss: 2.3874
+  Training Local Model for Intersection 3...
+    Initial Loss: 8.8303
+    Final Loss: 2.6708
+
+======================================================================
+  GENERALIZATION TEST (Unseen Traffic - Seed 9999)
+======================================================================
+
+[Reproducibility] Global seed set to 9999 (device: cuda)
+  Local-ML MAE on unseen data: 1.9353
+  FL MAE on unseen data:       1.7392
+  FL Improvement:              +10.13%
+  FL WINS GENERALIZATION:      YES
+
+  Saved: generalization_test.json
+
+======================================================================
+  FINAL SUMMARY - FL PERFORMANCE
+======================================================================
+
+  FL vs Baselines (Wait Time):
+    vs Fixed-Time:  +28.7%
+    vs Actuated:    -8.8%
+    vs Local-ML:    -4.4%
+
+  FL vs Local-ML (Accuracy):
+    MAE Improvement:       -6.64%
+
+  FL Stability Advantage:
+    Variance Reduction:    +62.7% lower std dev
+
+  SCORECARD:
+    FL beats Fixed-Time (Wait):    [YES]
+    FL beats Actuated (Wait):      [NO]
+    FL beats Local-ML (MAE):       [NO]
+    FL beats Local-ML (Stability): [YES]
+    FL Generalizes Better:         [YES]
+
+  TOTAL FL WINS: 2/4 categories + Generalization + Privacy
+
+  KEY NARRATIVE:
+    "FL achieves -6.6% better prediction accuracy,
+     63% lower variance, and preserves privacy
+     while maintaining competitive wait times."
+
+  All results saved to: results\ieee
+======================================================================
+
+
+(venv) C:\Users\AKSHAY\Music\TRAFFIC SIGNALS>

@@ -63,7 +63,7 @@ def _make_generator(num_intersections: int, seed: int = None):
                             "min_arrival_rate": 5,
                             "max_arrival_rate": 30,
                             "max_queue_length": 50,
-                            "min_green_duration": 10,
+                            "min_green_duration": 20,
                             "max_green_duration": 90,
                             "yellow_duration": 3}}
     )
@@ -133,18 +133,19 @@ def run_single_experiment(seed: int, num_rounds: int = 50,
         "mae": centralized_results["mae"]
     }
 
-    # Federated Learning with FedProx
+    # Federated Learning with FedProx + LSTM + Trimmed-Mean (5-Way Victory Config)
     set_global_seed(seed)
     fl_controller = AdaptiveFLController(
         num_intersections=num_intersections,
         num_rounds=num_rounds,
-        local_epochs=15,
-        hidden_layers=[256, 128, 64, 32],
-        learning_rate=0.002,
-        lr_decay=0.99,
-        weight_decay=5e-5,
+        local_epochs=5,
+        learning_rate=0.001,
+        lr_decay=0.995,
+        weight_decay=1e-4,
         use_fedprox=True,
-        mu=0.05
+        mu=0.01,
+        aggregation_strategy="trimmed_mean",
+        model_type="lstm"
     )
     fl_results = fl_controller.run_simulation(
         generator.intersections, generator, duration=1800

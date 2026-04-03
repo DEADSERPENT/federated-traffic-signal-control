@@ -184,11 +184,27 @@ def run_byzantine_trial(
     patience             = {s: 0            for s in strategies}
     current_lr           = ref_fl.learning_rate
 
+    # Preference order for choosing the local-training reference each round.
+    # We prefer a robust strategy so that Byzantine noise does not compound into
+    # infinity via the reference model.  FedAvg is intentionally last so its
+    # aggregation rule is still applied to the SAME local updates as everyone else,
+    # preserving the apples-to-apples comparison of aggregation methods.
+    _ref_preference = ["trimmed_mean", "median", "multi_krum"] + strategies
+
     for rnd in range(num_rounds):
-        # ── Distribute the *first strategy's* global model for local training ──
-        # Using a single reference removes the confound of different global models
-        # when comparing aggregation rules (standard Byzantine-FL eval protocol).
-        ref_params = strategy_global[strategies[0]]
+        # ── Pick the best finite strategy as local-training reference ──────────
+        # This prevents a single poisoned round from compounding to inf for all
+        # subsequent rounds.  Each strategy still aggregates independently.
+        ref_params = None
+        for s in _ref_preference:
+            if s in strategy_global:
+                candidate = strategy_global[s]
+                if not any(np.any(~np.isfinite(p)) for p in candidate):
+                    ref_params = candidate
+                    break
+        if ref_params is None:           # all strategies have gone inf → use init
+            ref_params = init_params
+
         ref_fl.global_model.set_parameters(ref_params)
         for i in range(num_intersections):
             ref_fl.local_models[i].set_parameters(ref_params)

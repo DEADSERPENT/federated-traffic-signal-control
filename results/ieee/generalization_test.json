@@ -1,6 +1,6 @@
 {
   "seed": 9999,
-  "fl_mae": 1.9791084229946136,
-  "local_ml_mae": 2.275804817676544,
-  "fl_wins": true
+  "fl_mae": 9.428836822509766,
+  "local_ml_mae": 8.886934041976929,
+  "fl_wins": false
 }

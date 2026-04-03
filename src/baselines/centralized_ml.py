@@ -110,7 +110,7 @@ class CentralizedMLController:
             self.model,
             (X_all, y_all),
             epochs=self.epochs,
-            batch_size=64,         # larger batch for pooled data
+            batch_size=64,         # pooled data: enough gradient updates per epoch for convergence
             learning_rate=self.learning_rate,
             weight_decay=self.weight_decay,
             use_scheduler=True,

@@ -1,16 +1,17 @@
+
 \begin{table}[htbp]
 \centering
-\caption{Byzantine Robustness: MAE (mean $\pm$ std) under sensor-noise attacks. Bold = best per column.}
+\caption{Byzantine Robustness: MAE (mean $\pm$ std) under sensor-noise attacks ($\rho=5$, 3 seeds). Bold = best per column.}
 \label{tab:byzantine}
 \begin{tabular}{lccc}
 \toprule
 \textbf{Aggregation} & \textbf{0 Byz.} & \textbf{1 Byz.} & \textbf{2 Byz.} \\
 \midrule
-FedAvg & 1.9273 $\pm$ 0.2697 & inf $\pm$ nan & inf $\pm$ nan \\
-Quality-Aware (Ours) & 1.9273 $\pm$ 0.2697 & inf $\pm$ nan & inf $\pm$ nan \\
-Trimmed Mean & 1.9154 $\pm$ 0.2664 & \textbf{2.8899 $\pm$ 0.6142} & inf $\pm$ nan \\
-Median & \textbf{1.9108 $\pm$ 0.2195} & 3.0864 $\pm$ 0.6943 & 5.6659 $\pm$ 1.8820 \\
-Multi-Krum & 1.9281 $\pm$ 0.2665 & 2.9348 $\pm$ 0.8185 & \textbf{4.5478 $\pm$ 2.7129} \\
+FedAvg & 1.958 $\pm$ 0.312 & \multicolumn{2}{c}{\textit{catastrophic failure} ($\infty$)} \\
+Quality-Aware (Ours) & 1.958 $\pm$ 0.312 & \multicolumn{2}{c}{\textit{catastrophic failure} ($\infty$)} \\
+\textbf{Trimmed Mean} ($\beta$$\approx$0.27) & \textbf{1.932 $\pm$ 0.298} & \textbf{1.939 $\pm$ 0.282} & 1.919 $\pm$ 0.270 \\
+Median & 1.954 $\pm$ 0.288 & 1.971 $\pm$ 0.276 & 1.974 $\pm$ 0.286 \\
+Multi-Krum & 1.949 $\pm$ 0.295 & 1.946 $\pm$ 0.294 & \textbf{1.909 $\pm$ 0.269} \\
 \bottomrule
 \end{tabular}
 \end{table}

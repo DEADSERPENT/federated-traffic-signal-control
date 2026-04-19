@@ -251,6 +251,13 @@ def run_byzantine_trial(
         for strategy in strategies:
             if strategy == "quality_aware":
                 agg = ref_fl.federated_averaging(corrupted, weights, "quality_aware")
+            elif strategy == "resil_agg":
+                agg = robust_aggregate(
+                    corrupted,
+                    strategy="resil_agg",
+                    losses=round_losses,
+                    data_sizes=data_sizes,
+                )
             else:
                 agg = robust_aggregate(
                     corrupted,
@@ -357,8 +364,9 @@ def plot_byzantine_results(
 
     # Strategy display metadata
     meta = {
-        "quality_aware":  {"label": "Quality-Aware (Ours)",  "color": "#e74c3c",  "marker": "o", "lw": 3},
-        "fedavg":         {"label": "FedAvg",                "color": "#95a5a6",  "marker": "s", "lw": 2},
+        "resil_agg":      {"label": "ResilAgg (Ours)",        "color": "#e74c3c",  "marker": "*", "lw": 3},
+        "quality_aware":  {"label": "Quality-Aware",          "color": "#f39c12",  "marker": "o", "lw": 2},
+        "fedavg":         {"label": "FedAvg",                 "color": "#95a5a6",  "marker": "s", "lw": 2},
         "trimmed_mean":   {"label": "Trimmed Mean",           "color": "#3498db",  "marker": "^", "lw": 2},
         "median":         {"label": "Median",                 "color": "#2ecc71",  "marker": "D", "lw": 2},
         "multi_krum":     {"label": "Multi-Krum",             "color": "#9b59b6",  "marker": "P", "lw": 2},
@@ -441,8 +449,9 @@ def generate_latex_table(sweep_results: dict, strategies: list) -> str:
     Generate LaTeX table: strategies × Byzantine counts.
     """
     strategy_labels = {
+        "resil_agg":     "\\textbf{ResilAgg (Ours)}",
         "fedavg":        "FedAvg",
-        "quality_aware": "Quality-Aware (Ours)",
+        "quality_aware": "Quality-Aware",
         "trimmed_mean":  "Trimmed Mean",
         "median":        "Median",
         "multi_krum":    "Multi-Krum",
@@ -519,7 +528,7 @@ def main():
     max_byzantine = min(2, (args.intersections - 3) // 2)
     byzantine_counts = list(range(0, max_byzantine + 1))
 
-    strategies = ["fedavg", "quality_aware", "trimmed_mean", "median", "multi_krum"]
+    strategies = ["resil_agg", "fedavg", "quality_aware", "trimmed_mean", "median", "multi_krum"]
     seeds      = list(range(42, 42 + args.seeds))
 
     print("\n" + "=" * 65)

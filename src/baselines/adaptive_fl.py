@@ -154,30 +154,53 @@ class AdaptiveFLController:
         self,
         model_params: List[List[np.ndarray]],
         weights: List[float] = None,
-        strategy: str = None
+        strategy: str = None,
+        losses: List[float] = None,
+        data_sizes: List[int] = None,
     ) -> List[np.ndarray]:
         """
         Perform aggregation using the configured strategy.
 
         Supported strategies:
-        - "quality_aware": Weighted by data size × inverse loss (default)
-        - "fedavg": Standard weighted averaging
-        - "median": Coordinate-wise median (Byzantine-robust)
+        - "resil_agg":    Novel MAD-filtered quality-aware aggregation (recommended)
+        - "quality_aware":Weighted by data size × inverse loss
+        - "fedavg":       Standard weighted averaging
+        - "median":       Coordinate-wise median (Byzantine-robust)
         - "trimmed_mean": Remove outliers before averaging
-        - "krum": Select most representative client (Byzantine-tolerant)
-        - "multi_krum": Average top-k representative clients
+        - "krum":         Select most representative client (Byzantine-tolerant)
+        - "multi_krum":   Average top-k representative clients
 
         Args:
             model_params: List of model parameters from each client
-            weights: Optional weights for each client (based on data size/quality)
-            strategy: Override the default aggregation strategy
+            weights:      Optional pre-computed weights (used by quality_aware/fedavg)
+            strategy:     Override the default aggregation strategy
+            losses:       Local training losses per client (required for resil_agg)
+            data_sizes:   Local dataset sizes per client (required for resil_agg)
 
         Returns:
             Aggregated parameters
         """
         strategy = strategy or self.aggregation_strategy
 
-        # Quality-aware is our custom weighted FedAvg with inverse-loss weighting
+        # ── ResilAgg: novel two-stage MAD-filtered quality-aware aggregation ──
+        if strategy == "resil_agg":
+            n = len(model_params)
+            _losses     = losses     or [1.0] * n
+            _data_sizes = data_sizes or [1]   * n
+
+            np_params = [
+                [p.cpu().numpy() if isinstance(p, torch.Tensor) else p for p in client]
+                for client in model_params
+            ]
+            np_result = robust_aggregate(
+                np_params,
+                strategy="resil_agg",
+                losses=_losses,
+                data_sizes=_data_sizes,
+            )
+            return [torch.as_tensor(p, device=self.device) for p in np_result]
+
+        # ── Quality-aware: inverse-loss weighted FedAvg ──────────────────────
         if strategy == "quality_aware":
             if weights is None:
                 weights = [1.0 / len(model_params)] * len(model_params)
@@ -185,19 +208,16 @@ class AdaptiveFLController:
                 total = sum(weights)
                 weights = [w / total for w in weights]
 
-            # Check if params are GPU tensors or numpy arrays
             if isinstance(model_params[0][0], torch.Tensor):
-                # Stay on GPU — no CPU roundtrip
                 weight_tensors = torch.tensor(weights, dtype=torch.float32,
                                               device=model_params[0][0].device)
                 avg_params = []
                 for i in range(len(model_params[0])):
-                    layer_stack = torch.stack([p[i].float() for p in model_params])  # [K, ...]
+                    layer_stack = torch.stack([p[i].float() for p in model_params])
                     w = weight_tensors.view(-1, *([1] * (layer_stack.dim() - 1)))
                     avg_params.append((layer_stack * w).sum(dim=0).to(model_params[0][i].dtype))
                 return avg_params
             else:
-                # Fallback: numpy path
                 avg_params = []
                 for i in range(len(model_params[0])):
                     layer_params = [params[i] for params in model_params]
@@ -207,7 +227,7 @@ class AdaptiveFLController:
                     avg_params.append(weighted_avg.astype(layer_params[0].dtype))
                 return avg_params
 
-        # Convert GPU tensors → numpy before passing to numpy-based robust_aggregate
+        # ── All other strategies (numpy-based robust_aggregate) ───────────────
         np_params = [
             [p.cpu().numpy() if isinstance(p, torch.Tensor) else p for p in client]
             for client in model_params
@@ -219,7 +239,6 @@ class AdaptiveFLController:
             num_byzantine=self.num_byzantine,
             trim_ratio=0.1
         )
-        # Convert numpy results back to GPU tensors so set_parameters_gpu works
         return [torch.as_tensor(p, device=self.device) for p in np_result]
 
     def train_federated(

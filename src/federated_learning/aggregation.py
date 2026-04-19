@@ -5,17 +5,21 @@ Protects against:
 - Faulty sensors sending garbage data
 - Byzantine (malicious) clients attempting model poisoning
 - Outlier updates from divergent local training
+- Directional (ALIE-style) scaling attacks
 
 Strategies:
-- FedAvg: Standard weighted averaging (baseline)
-- Median: Coordinate-wise median (robust to outliers)
-- TrimmedMean: Remove extreme values before averaging
-- Krum: Select most representative update (Byzantine-tolerant)
-- MultiKrum: Average top-k most representative updates
+- FedAvg:       Standard weighted averaging (baseline)
+- Median:       Coordinate-wise median (robust to outliers)
+- TrimmedMean:  Remove extreme values before averaging
+- Krum:         Select most representative update (Byzantine-tolerant)
+- MultiKrum:    Average top-k most representative updates
+- ResilAgg:     Novel two-stage MAD-filtered quality-aware aggregation
+                Designed for adversarial, highly Non-IID ITS deployments
 """
 
 import numpy as np
-from typing import List, Tuple, Optional
+import warnings
+from typing import List, Optional, Tuple
 from enum import Enum
 
 
@@ -26,7 +30,86 @@ class AggregationStrategy(Enum):
     TRIMMED_MEAN = "trimmed_mean"
     KRUM = "krum"
     MULTI_KRUM = "multi_krum"
+    RESIL_AGG = "resil_agg"
 
+
+# ─────────────────────────────────────────────────────────────────────────────
+#  SHARED HELPERS
+# ─────────────────────────────────────────────────────────────────────────────
+
+def _flatten_params(model_params: List[List[np.ndarray]]) -> np.ndarray:
+    """Flatten each client's parameter list into a single 1-D vector."""
+    flattened = []
+    for params in model_params:
+        flat = np.concatenate([p.flatten().astype(np.float32) for p in params])
+        flattened.append(flat)
+    return np.stack(flattened, axis=0)  # [n_clients, n_params]
+
+
+def _compute_distances(model_params: List[List[np.ndarray]]) -> np.ndarray:
+    """
+    Pairwise Euclidean distance matrix (used by Krum / Multi-Krum).
+
+    Returns:
+        n_clients × n_clients float32 distance matrix
+    """
+    flattened = _flatten_params(model_params)
+    n = flattened.shape[0]
+    distances = np.zeros((n, n), dtype=np.float32)
+    for i in range(n):
+        for j in range(i + 1, n):
+            dist = np.linalg.norm(flattened[i] - flattened[j])
+            distances[i, j] = dist
+            distances[j, i] = dist
+    return distances
+
+
+def _compute_hybrid_distances(flattened: np.ndarray) -> np.ndarray:
+    """
+    Hybrid distance matrix fusing L2 magnitude and cosine direction.
+
+    Motivation
+    ----------
+    Standard L2-only aggregators (Krum, Multi-Krum) are vulnerable to
+    "A Little Is Enough" (ALIE) attacks [Baruch et al., 2019] where
+    adversaries scale their updates to sit just inside the Euclidean
+    clipping radius while inverting the gradient direction.
+
+    The hybrid metric
+
+        d_hybrid(i, j) = ||u_i - u_j||_2 * (1 + (1 - cos(u_i, u_j)))
+
+    simultaneously penalises both magnitude divergence (L2 term) and
+    directional inversion (cosine term), making it significantly harder
+    to craft updates that evade detection on both axes at once.
+
+    Args:
+        flattened: [n_clients, n_params] float32 array
+
+    Returns:
+        n_clients × n_clients float32 hybrid distance matrix
+    """
+    n = flattened.shape[0]
+    distances = np.zeros((n, n), dtype=np.float32)
+
+    norms = np.linalg.norm(flattened, axis=1)
+    norms = np.where(norms == 0, 1e-10, norms)  # guard against zero-norm updates
+
+    for i in range(n):
+        for j in range(i + 1, n):
+            l2_dist = np.linalg.norm(flattened[i] - flattened[j])
+            cos_sim = np.dot(flattened[i], flattened[j]) / (norms[i] * norms[j])
+            cos_dist = 1.0 - float(cos_sim)
+            hybrid = l2_dist * (1.0 + cos_dist)
+            distances[i, j] = hybrid
+            distances[j, i] = hybrid
+
+    return distances
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+#  STANDARD BASELINES
+# ─────────────────────────────────────────────────────────────────────────────
 
 def fedavg_aggregate(
     model_params: List[List[np.ndarray]],
@@ -48,7 +131,6 @@ def fedavg_aggregate(
     if weights is None:
         weights = [1.0 / len(model_params)] * len(model_params)
     else:
-        # Normalize weights
         total = sum(weights)
         weights = [w / total for w in weights]
 
@@ -85,10 +167,8 @@ def median_aggregate(
 
     median_params = []
     for layer_idx in range(len(model_params[0])):
-        # Stack all client parameters for this layer
         layer_stack = np.stack([params[layer_idx].astype(np.float32)
                                for params in model_params], axis=0)
-        # Compute coordinate-wise median
         layer_median = np.median(layer_stack, axis=0)
         median_params.append(layer_median.astype(model_params[0][layer_idx].dtype))
 
@@ -120,53 +200,19 @@ def trimmed_mean_aggregate(
     n_clients = len(model_params)
     n_trim = max(1, int(n_clients * trim_ratio))
 
-    # Need at least 3 clients after trimming
     if n_clients - 2 * n_trim < 1:
-        # Fall back to median if not enough clients
         return median_aggregate(model_params)
 
     trimmed_params = []
     for layer_idx in range(len(model_params[0])):
         layer_stack = np.stack([params[layer_idx].astype(np.float32)
                                for params in model_params], axis=0)
-
-        # Sort along client axis and trim
         sorted_stack = np.sort(layer_stack, axis=0)
         trimmed_stack = sorted_stack[n_trim:n_clients - n_trim]
-
-        # Compute mean of remaining values
         layer_mean = np.mean(trimmed_stack, axis=0)
         trimmed_params.append(layer_mean.astype(model_params[0][layer_idx].dtype))
 
     return trimmed_params
-
-
-def _compute_distances(model_params: List[List[np.ndarray]]) -> np.ndarray:
-    """
-    Compute pairwise Euclidean distances between model updates.
-
-    Returns:
-        n_clients x n_clients distance matrix
-    """
-    n_clients = len(model_params)
-
-    # Flatten all parameters for each client
-    flattened = []
-    for params in model_params:
-        flat = np.concatenate([p.flatten().astype(np.float32) for p in params])
-        flattened.append(flat)
-
-    flattened = np.stack(flattened, axis=0)  # [n_clients, n_params]
-
-    # Compute pairwise L2 distances
-    distances = np.zeros((n_clients, n_clients), dtype=np.float32)
-    for i in range(n_clients):
-        for j in range(i + 1, n_clients):
-            dist = np.linalg.norm(flattened[i] - flattened[j])
-            distances[i, j] = dist
-            distances[j, i] = dist
-
-    return distances
 
 
 def krum_aggregate(
@@ -177,8 +223,7 @@ def krum_aggregate(
     """
     Krum Aggregation (Byzantine-tolerant).
 
-    Selects the single model update that is closest to its neighbors.
-    Tolerates up to num_byzantine malicious clients.
+    Selects the single model update closest to its n - f - 2 neighbours.
 
     Reference: Blanchard et al., "Machine Learning with Adversaries:
                Byzantine Tolerant Gradient Descent" (NeurIPS 2017)
@@ -195,30 +240,17 @@ def krum_aggregate(
         raise ValueError("No model parameters provided")
 
     n_clients = len(model_params)
-
-    # Need at least 2f + 3 clients where f = num_byzantine
-    min_clients = 2 * num_byzantine + 3
-    if n_clients < min_clients:
-        # Fall back to median if not enough clients
+    if n_clients < 2 * num_byzantine + 3:
         return median_aggregate(model_params)
 
-    # Compute pairwise distances
     distances = _compute_distances(model_params)
-
-    # For each client, compute sum of distances to n - f - 2 closest neighbors
     n_neighbors = n_clients - num_byzantine - 2
     scores = np.zeros(n_clients)
-
     for i in range(n_clients):
-        # Sort distances to other clients
         sorted_dists = np.sort(distances[i])
-        # Sum distances to n_neighbors closest (excluding self which is 0)
         scores[i] = np.sum(sorted_dists[1:n_neighbors + 1])
 
-    # Select client with lowest score (most representative)
-    selected_idx = np.argmin(scores)
-
-    return model_params[selected_idx]
+    return model_params[int(np.argmin(scores))]
 
 
 def multi_krum_aggregate(
@@ -246,32 +278,160 @@ def multi_krum_aggregate(
         raise ValueError("No model parameters provided")
 
     n_clients = len(model_params)
-
     if num_select is None:
         num_select = max(1, n_clients - num_byzantine)
 
-    min_clients = 2 * num_byzantine + 3
-    if n_clients < min_clients:
+    if n_clients < 2 * num_byzantine + 3:
         return median_aggregate(model_params)
 
-    # Compute pairwise distances
     distances = _compute_distances(model_params)
-
-    # Compute Krum scores
     n_neighbors = n_clients - num_byzantine - 2
     scores = np.zeros(n_clients)
-
     for i in range(n_clients):
         sorted_dists = np.sort(distances[i])
         scores[i] = np.sum(sorted_dists[1:n_neighbors + 1])
 
-    # Select top num_select clients with lowest scores
     selected_indices = np.argsort(scores)[:num_select]
+    return fedavg_aggregate([model_params[i] for i in selected_indices])
 
-    # Average selected clients
-    selected_params = [model_params[i] for i in selected_indices]
-    return fedavg_aggregate(selected_params)
 
+# ─────────────────────────────────────────────────────────────────────────────
+#  NOVEL: ResilAgg
+# ─────────────────────────────────────────────────────────────────────────────
+
+def resil_agg_aggregate(
+    model_params: List[List[np.ndarray]],
+    losses: List[float],
+    data_sizes: List[int],
+    mad_threshold: float = 3.0,
+    epsilon: float = 1e-5,
+) -> List[np.ndarray]:
+    """
+    ResilAgg: Dynamic MAD-Filtered Quality-Aware Aggregation.
+
+    Two-stage design for adversarial, heterogeneous ITS deployments:
+
+    Stage 1 — Dynamic Byzantine Filtering (no need to know f a priori)
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    Classical Krum / Multi-Krum require the operator to hard-code the number
+    of Byzantine nodes f before training begins.  In real urban deployments,
+    f is unknown and varies as sensors break or recover.
+
+    ResilAgg instead computes each client's *neighbourhood score*
+    (sum of hybrid distances to all peers) and applies a Modified Z-score
+    filter based on the Median Absolute Deviation (MAD):
+
+        z_i = 0.6745 * (score_i - median_score) / MAD(scores)
+
+    Clients with z_i > mad_threshold (default 3.0, equivalent to ~3σ in a
+    Gaussian world and recommended by [Iglewicz & Hoaglin, 1993]) are
+    classified as outliers and dropped.  Because the threshold is derived
+    from the data each round rather than a fixed f, the method adapts
+    automatically to the current attack intensity.
+
+    The hybrid distance metric (L2 × (1 + cosine_distance)) catches both
+    magnitude-scaled attacks and direction-inverting (ALIE-style) attacks
+    that pure-L2 aggregators miss [Baruch et al., 2019].
+
+    Stage 2 — Quality-Aware Aggregation on Honest Survivors
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    After Byzantine clients are removed, surviving clients are aggregated
+    using Quality-Aware (inverse-loss × data-size) weights:
+
+        α_k = n_k / (L_k + ε)    (unnormalised)
+
+    This ensures that honest-but-statistically-distant clients (e.g. a CBD
+    intersection with extreme Non-IID traffic) still contribute in proportion
+    to their data quality, addressing the Non-IID vs. Byzantine dilemma
+    identified in recent ITS-FL literature.
+
+    Fallback behaviour
+    ------------------
+    - < 3 clients:           falls back to FedAvg.
+    - All clients filtered:  falls back to strict Krum (argmin score).
+
+    Args:
+        model_params:   List of per-client model parameter lists (numpy arrays).
+        losses:         Local training loss for each client (lower = better).
+        data_sizes:     Number of local training samples per client.
+        mad_threshold:  Modified Z-score threshold for outlier rejection (default 3.0).
+        epsilon:        Numerical stability constant for inverse-loss weights.
+
+    Returns:
+        Aggregated model parameters as a list of numpy arrays.
+
+    References
+    ----------
+    - Blanchard et al., "Machine Learning with Adversaries: Byzantine Tolerant
+      Gradient Descent." NeurIPS 2017.
+    - Baruch et al., "A Little Is Enough: Circumventing Defenses For Distributed
+      Learning." NeurIPS 2019.
+    - Iglewicz & Hoaglin, "How to Detect and Handle Outliers." ASQ Press, 1993.
+    - Yin et al., "Byzantine-Robust Distributed Learning: Towards Optimal
+      Statistical Rates." ICML 2018.
+    """
+    if not model_params:
+        raise ValueError("No model parameters provided")
+
+    n_clients = len(model_params)
+
+    if n_clients < 3:
+        warnings.warn(
+            "ResilAgg requires >= 3 clients for MAD filtering. "
+            "Falling back to FedAvg.",
+            stacklevel=2,
+        )
+        return fedavg_aggregate(model_params)
+
+    # ── Stage 1: Dynamic Byzantine filtering via MAD ─────────────────────────
+    flattened = _flatten_params(model_params)
+    distances = _compute_hybrid_distances(flattened)
+
+    # Neighbourhood score: sum of hybrid distances to all other clients.
+    # Byzantine clients (far from the honest cluster) get high scores.
+    client_scores = np.sum(distances, axis=1)
+
+    median_score = np.median(client_scores)
+    mad = np.median(np.abs(client_scores - median_score))
+    mad = max(mad, 1e-8)  # prevent division by zero when all updates are identical
+
+    # Modified Z-score (Iglewicz & Hoaglin, 1993)
+    z_scores = 0.6745 * (client_scores - median_score) / mad
+
+    # Survivors: clients whose scores are not anomalously high
+    survivor_indices = [i for i, z in enumerate(z_scores) if z <= mad_threshold]
+
+    # Fallback when attack is so massive (>50% colluding) that MAD breaks
+    if len(survivor_indices) == 0:
+        survivor_indices = [int(np.argmin(client_scores))]  # strict Krum fallback
+
+    # ── Stage 2: Quality-Aware aggregation on surviving honest clients ────────
+    survivor_params = [model_params[i] for i in survivor_indices]
+    survivor_losses = [losses[i] for i in survivor_indices]
+    survivor_sizes  = [data_sizes[i] for i in survivor_indices]
+
+    # α_k = n_k / (L_k + ε)  — reward large, low-loss nodes
+    raw_weights = [
+        sz * (1.0 / (lk + epsilon))
+        for sz, lk in zip(survivor_sizes, survivor_losses)
+    ]
+    total_weight = sum(raw_weights)
+    norm_weights = [w / total_weight for w in raw_weights]
+
+    avg_params = []
+    for layer_idx in range(len(survivor_params[0])):
+        layer_tensors = [p[layer_idx] for p in survivor_params]
+        weighted_avg = np.zeros_like(layer_tensors[0], dtype=np.float32)
+        for param, w in zip(layer_tensors, norm_weights):
+            weighted_avg += param.astype(np.float32) * w
+        avg_params.append(weighted_avg.astype(survivor_params[0][layer_idx].dtype))
+
+    return avg_params
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+#  MAIN ROUTING FUNCTION
+# ─────────────────────────────────────────────────────────────────────────────
 
 def robust_aggregate(
     model_params: List[List[np.ndarray]],
@@ -284,9 +444,16 @@ def robust_aggregate(
 
     Args:
         model_params: List of model parameters from each client
-        weights: Optional weights for weighted strategies
-        strategy: Aggregation strategy name
-        **kwargs: Additional arguments for specific strategies
+        weights: Optional weights for weighted strategies (used by fedavg)
+        strategy: Aggregation strategy name — one of:
+                  fedavg | median | trimmed_mean | krum | multi_krum | resil_agg
+        **kwargs: Strategy-specific options:
+                  - trim_ratio (float):    for trimmed_mean
+                  - num_byzantine (int):   for krum / multi_krum
+                  - num_select (int):      for multi_krum
+                  - losses (list[float]):  for resil_agg
+                  - data_sizes (list[int]):for resil_agg
+                  - mad_threshold (float): for resil_agg
 
     Returns:
         Aggregated model parameters
@@ -300,68 +467,93 @@ def robust_aggregate(
         return median_aggregate(model_params, weights)
 
     elif strategy == "trimmed_mean":
-        trim_ratio = kwargs.get("trim_ratio", 0.1)
-        return trimmed_mean_aggregate(model_params, weights, trim_ratio)
+        return trimmed_mean_aggregate(
+            model_params, weights,
+            trim_ratio=kwargs.get("trim_ratio", 0.1)
+        )
 
     elif strategy == "krum":
-        num_byzantine = kwargs.get("num_byzantine", 1)
-        return krum_aggregate(model_params, weights, num_byzantine)
+        return krum_aggregate(
+            model_params, weights,
+            num_byzantine=kwargs.get("num_byzantine", 1)
+        )
 
     elif strategy == "multi_krum":
-        num_byzantine = kwargs.get("num_byzantine", 1)
-        num_select = kwargs.get("num_select", None)
-        return multi_krum_aggregate(model_params, weights, num_byzantine, num_select)
+        return multi_krum_aggregate(
+            model_params, weights,
+            num_byzantine=kwargs.get("num_byzantine", 1),
+            num_select=kwargs.get("num_select", None)
+        )
+
+    elif strategy == "resil_agg":
+        n = len(model_params)
+        losses     = kwargs.get("losses",     [1.0] * n)
+        data_sizes = kwargs.get("data_sizes", [1]   * n)
+        return resil_agg_aggregate(
+            model_params,
+            losses=losses,
+            data_sizes=data_sizes,
+            mad_threshold=kwargs.get("mad_threshold", 3.0),
+        )
 
     else:
-        raise ValueError(f"Unknown aggregation strategy: {strategy}. "
-                        f"Choose from: fedavg, median, trimmed_mean, krum, multi_krum")
+        raise ValueError(
+            f"Unknown aggregation strategy: '{strategy}'. "
+            "Choose from: fedavg, median, trimmed_mean, krum, multi_krum, resil_agg"
+        )
 
+
+# ─────────────────────────────────────────────────────────────────────────────
+#  SMOKE TEST
+# ─────────────────────────────────────────────────────────────────────────────
 
 if __name__ == "__main__":
-    """Test aggregation strategies."""
-    print("="*60)
-    print("Testing Byzantine-Robust Aggregation Strategies")
-    print("="*60)
+    print("=" * 60)
+    print("Testing Aggregation Strategies (incl. ResilAgg)")
+    print("=" * 60)
 
-    # Create mock model parameters (3 layers, 5 clients)
     np.random.seed(42)
-    n_clients = 5
+    n_clients = 7  # 5 honest + 2 Byzantine
 
-    # Normal clients
-    model_params = []
-    for i in range(n_clients - 1):
-        params = [
-            np.random.randn(10, 6).astype(np.float32) + i * 0.1,  # Layer 1
-            np.random.randn(10).astype(np.float32),               # Bias 1
-            np.random.randn(1, 10).astype(np.float32),            # Layer 2
+    honest_params = [
+        [
+            np.random.randn(10, 6).astype(np.float32) + i * 0.05,
+            np.random.randn(10).astype(np.float32),
+            np.random.randn(1, 10).astype(np.float32),
         ]
-        model_params.append(params)
-
-    # Byzantine client (outlier)
-    byzantine_params = [
-        np.random.randn(10, 6).astype(np.float32) * 100,  # Huge values!
-        np.random.randn(10).astype(np.float32) * 100,
-        np.random.randn(1, 10).astype(np.float32) * 100,
+        for i in range(n_clients - 2)
     ]
-    model_params.append(byzantine_params)
 
-    print(f"\nClients: {n_clients - 1} normal + 1 Byzantine (outlier)")
-    print(f"Byzantine client has 100x larger values")
+    byzantine_params = [
+        [
+            np.random.randn(10, 6).astype(np.float32) * 100,
+            np.random.randn(10).astype(np.float32) * 100,
+            np.random.randn(1, 10).astype(np.float32) * 100,
+        ]
+        for _ in range(2)
+    ]
 
-    # Test each strategy
-    strategies = ["fedavg", "median", "trimmed_mean", "krum", "multi_krum"]
+    all_params  = honest_params + byzantine_params
+    losses      = [0.05 + i * 0.01 for i in range(n_clients - 2)] + [999.0, 999.0]
+    data_sizes  = [500] * (n_clients - 2) + [1, 1]
 
-    for strategy in strategies:
-        result = robust_aggregate(model_params, strategy=strategy)
+    print(f"\nClients: {n_clients - 2} honest + 2 Byzantine (100x noise)")
+
+    strategies = [
+        ("fedavg",       {}),
+        ("median",       {}),
+        ("trimmed_mean", {"trim_ratio": 0.15}),
+        ("krum",         {"num_byzantine": 2}),
+        ("multi_krum",   {"num_byzantine": 2}),
+        ("resil_agg",    {"losses": losses, "data_sizes": data_sizes}),
+    ]
+
+    for name, kwargs in strategies:
+        result  = robust_aggregate(all_params, strategy=name, **kwargs)
         max_val = max(np.max(np.abs(p)) for p in result)
-        print(f"\n{strategy.upper():15} -> Max absolute value: {max_val:.4f}")
+        tag = "(Corrupted!)" if max_val > 10 else "(Robust    )"
+        print(f"  {name:<14} max |w| = {max_val:10.4f}  {tag}")
 
-        # FedAvg should be corrupted by Byzantine client
-        if strategy == "fedavg":
-            print(f"                  (Corrupted by Byzantine client!)")
-        else:
-            print(f"                  (Robust to Byzantine client)")
-
-    print("\n" + "="*60)
-    print("Aggregation strategies test complete!")
-    print("="*60)
+    print("\n" + "=" * 60)
+    print("Done.")
+    print("=" * 60)

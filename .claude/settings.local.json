@@ -2,7 +2,14 @@
   "permissions": {
     "allow": [
       "Bash(cd:*)",
-      "Bash(source:*)"
+      "Bash(source:*)",
+      "Bash(python:*)",
+      "Bash(python3:*)",
+      "Read(//usr/bin/**)",
+      "Read(//home/deadserpent/.local/**)",
+      "Bash(conda activate:*)",
+      "Bash(pip3 show:*)",
+      "Bash(pip3 install:*)"
     ]
   }
 }

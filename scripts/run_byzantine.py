@@ -59,6 +59,7 @@ from utils.device import get_device, is_gpu_available
 from traffic_generator import TrafficDataGenerator
 from models.traffic_model import create_model, train_model, evaluate_model
 from federated_learning.aggregation import robust_aggregate, fedavg_aggregate
+from federated_learning.hierarchical import hierarchical_aggregate
 from baselines.adaptive_fl import AdaptiveFLController
 
 DEVICE = get_device()
@@ -258,6 +259,15 @@ def run_byzantine_trial(
                     losses=round_losses,
                     data_sizes=data_sizes,
                 )
+            elif strategy == "h_fl":
+                agg = hierarchical_aggregate(
+                    corrupted,
+                    losses=round_losses,
+                    data_sizes=data_sizes,
+                    num_intersections=num_intersections,
+                    fog_strategy="resil_agg",
+                    cloud_strategy="multi_krum",
+                )
             else:
                 agg = robust_aggregate(
                     corrupted,
@@ -364,6 +374,7 @@ def plot_byzantine_results(
 
     # Strategy display metadata
     meta = {
+        "h_fl":           {"label": "H-FL (Ours)",            "color": "#c0392b",  "marker": "H", "lw": 3},
         "resil_agg":      {"label": "ResilAgg (Ours)",        "color": "#e74c3c",  "marker": "*", "lw": 3},
         "quality_aware":  {"label": "Quality-Aware",          "color": "#f39c12",  "marker": "o", "lw": 2},
         "fedavg":         {"label": "FedAvg",                 "color": "#95a5a6",  "marker": "s", "lw": 2},
@@ -449,6 +460,7 @@ def generate_latex_table(sweep_results: dict, strategies: list) -> str:
     Generate LaTeX table: strategies × Byzantine counts.
     """
     strategy_labels = {
+        "h_fl":          "\\textbf{H-FL (Ours)}",
         "resil_agg":     "\\textbf{ResilAgg (Ours)}",
         "fedavg":        "FedAvg",
         "quality_aware": "Quality-Aware",
@@ -528,7 +540,7 @@ def main():
     max_byzantine = min(2, (args.intersections - 3) // 2)
     byzantine_counts = list(range(0, max_byzantine + 1))
 
-    strategies = ["resil_agg", "fedavg", "quality_aware", "trimmed_mean", "median", "multi_krum"]
+    strategies = ["h_fl", "resil_agg", "fedavg", "quality_aware", "trimmed_mean", "median", "multi_krum"]
     seeds      = list(range(42, 42 + args.seeds))
 
     print("\n" + "=" * 65)

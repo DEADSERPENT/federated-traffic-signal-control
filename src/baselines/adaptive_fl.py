@@ -7,11 +7,13 @@ Features:
 - GPU-Agnostic: Automatically uses GPU when available, falls back to CPU
 - FedProx: Handles Non-IID data with proximal term
 - Quality-aware aggregation: Inverse-loss weighted averaging
-- Byzantine-robust: Supports Krum, Trimmed Mean, Median aggregation
+- Byzantine-robust: Supports Krum, Trimmed Mean, Median, ResilAgg, H-FL
+- Prioritized Experience Replay: Over-samples rare/surprising traffic states
 """
 
 import numpy as np
 import torch
+import torch.nn as nn
 from typing import Dict, List, Tuple, Optional
 import sys
 import os
@@ -21,6 +23,140 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from models.traffic_model import create_model, train_model, evaluate_model
 from utils.device import get_device, is_gpu_available
 from federated_learning.aggregation import robust_aggregate, AggregationStrategy
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+#  NOVELTY 3: Prioritized Experience Replay Buffer
+# ─────────────────────────────────────────────────────────────────────────────
+
+class PrioritizedReplayBuffer:
+    """
+    Loss-prioritized experience replay for federated local training.
+
+    Motivation
+    ----------
+    Standard FL local training samples uniformly from the current round's
+    data.  Rare traffic events (sudden congestion, multi-direction gridlock)
+    produce large prediction errors but appear infrequently, so the model
+    seldom sees enough of them to learn the correct response.
+
+    This buffer stores recent (features, label) pairs weighted by their
+    per-sample Smooth-L1 loss.  Before each local training round, the buffer
+    is sampled proportionally to priority^alpha, guaranteeing that high-error
+    corner-cases are systematically over-represented.
+
+    Reference: Schaul et al. (ICLR 2016) "Prioritized Experience Replay",
+    adapted to the supervised FL setting for ITS (cf. Arunraj, Feb 2026).
+
+    Args:
+        capacity:    Maximum number of (feature, label) pairs stored.
+        alpha:       Priority exponent — higher = more aggressive prioritization.
+                     0 → uniform sampling; 1 → fully proportional.
+        beta:        IS-weight correction exponent (0 → no correction).
+                     Start low (0.4) and anneal to 1.0 over training.
+    """
+
+    def __init__(
+        self,
+        capacity: int = 2000,
+        alpha: float = 0.6,
+        beta: float = 0.4,
+    ):
+        self.capacity = capacity
+        self.alpha    = alpha
+        self.beta     = beta
+
+        # Ring-buffer storage
+        self._features:   List[np.ndarray] = []
+        self._labels:     List[float]      = []
+        self._priorities: List[float]      = []
+        self._ptr: int = 0                  # write pointer
+
+    def add_batch(
+        self,
+        features: np.ndarray,
+        labels: np.ndarray,
+        errors: np.ndarray,
+    ) -> None:
+        """
+        Add a batch of samples with their prediction errors as priorities.
+
+        Args:
+            features: [B, D] feature array
+            labels:   [B]    label array
+            errors:   [B]    absolute per-sample prediction errors
+        """
+        priorities = (np.abs(errors).astype(np.float32) + 1e-6) ** self.alpha
+
+        for f, l, p in zip(features, labels.flatten(), priorities):
+            if len(self._features) < self.capacity:
+                self._features.append(f.copy())
+                self._labels.append(float(l))
+                self._priorities.append(float(p))
+            else:
+                # Ring-buffer overwrite at _ptr
+                self._features[self._ptr]   = f.copy()
+                self._labels[self._ptr]     = float(l)
+                self._priorities[self._ptr] = float(p)
+                self._ptr = (self._ptr + 1) % self.capacity
+
+    def sample(self, n: int) -> Tuple[np.ndarray, np.ndarray]:
+        """
+        Sample n items with probability proportional to priority^alpha.
+
+        Args:
+            n: Number of samples to draw (capped at buffer size).
+
+        Returns:
+            (features [n, D], labels [n]) numpy arrays
+        """
+        buf_size = len(self._features)
+        if buf_size == 0:
+            raise RuntimeError("Cannot sample from empty replay buffer.")
+
+        probs = np.array(self._priorities[:buf_size], dtype=np.float64)
+        probs /= probs.sum()
+
+        n = min(n, buf_size)
+        indices = np.random.choice(buf_size, size=n, replace=False, p=probs)
+
+        feat = np.array([self._features[i] for i in indices], dtype=np.float32)
+        labs = np.array([self._labels[i]   for i in indices], dtype=np.float32)
+        return feat, labs
+
+    def __len__(self) -> int:
+        return len(self._features)
+
+    def is_ready(self, min_samples: int = 64) -> bool:
+        """True once the buffer has enough samples to be useful."""
+        return len(self) >= min_samples
+
+
+def compute_per_sample_errors(
+    model: nn.Module,
+    features: np.ndarray,
+    labels: np.ndarray,
+    device: torch.device,
+) -> np.ndarray:
+    """
+    One forward pass to obtain per-sample absolute prediction errors.
+
+    Args:
+        model:    Trained local model.
+        features: [N, D] numpy feature array.
+        labels:   [N]    numpy label array.
+        device:   Target device.
+
+    Returns:
+        [N] float32 numpy array of absolute errors |ŷ - y|.
+    """
+    model.eval()
+    with torch.no_grad():
+        X = torch.FloatTensor(features).to(device)
+        y = torch.FloatTensor(labels).to(device)
+        preds = model(X).squeeze()
+        errors = torch.abs(preds - y).cpu().numpy().astype(np.float32)
+    return errors
 
 
 def compute_heuristic_green(features: np.ndarray) -> float:
@@ -93,7 +229,11 @@ class AdaptiveFLController:
         device: Optional[torch.device] = None,  # GPU/CPU device
         aggregation_strategy: str = "multi_krum",  # Robust aggregation default
         num_byzantine: int = 0,  # Expected Byzantine clients (for Krum)
-        model_type: str = "lstm"  # Temporal-aware model for predictive advantage
+        model_type: str = "lstm",  # Temporal-aware model for predictive advantage
+        use_prioritized_replay: bool = True,  # Loss-prioritized experience replay
+        replay_buffer_capacity: int = 2000,   # Max samples per intersection buffer
+        replay_alpha: float = 0.6,            # Priority exponent
+        replay_blend_ratio: float = 0.30,     # Fraction of training data from replay
     ):
         self.num_intersections = num_intersections
         # DEEPER architecture for superior representation
@@ -110,6 +250,12 @@ class AdaptiveFLController:
         self.aggregation_strategy = aggregation_strategy
         self.num_byzantine = num_byzantine
         self.model_type = model_type
+
+        # Prioritized Replay settings
+        self.use_prioritized_replay = use_prioritized_replay
+        self.replay_buffer_capacity = replay_buffer_capacity
+        self.replay_alpha           = replay_alpha
+        self.replay_blend_ratio     = replay_blend_ratio
 
         # Set device - auto-detect if not specified
         self.device = device if device is not None else get_device()
@@ -150,6 +296,15 @@ class AdaptiveFLController:
         self.intersection_correlations = {}
         self.phase_efficiency_tracker = {}
 
+        # Per-intersection prioritized replay buffers (Novelty 3)
+        self.replay_buffers: Dict[int, PrioritizedReplayBuffer] = {}
+        if self.use_prioritized_replay:
+            for i in range(num_intersections):
+                self.replay_buffers[i] = PrioritizedReplayBuffer(
+                    capacity=self.replay_buffer_capacity,
+                    alpha=self.replay_alpha,
+                )
+
     def federated_averaging(
         self,
         model_params: List[List[np.ndarray]],
@@ -181,6 +336,23 @@ class AdaptiveFLController:
             Aggregated parameters
         """
         strategy = strategy or self.aggregation_strategy
+
+        # ── H-FL: hierarchical two-level Byzantine-robust aggregation ─────────
+        if strategy == "h_fl":
+            n = len(model_params)
+            _losses     = losses     or [1.0] * n
+            _data_sizes = data_sizes or [1]   * n
+            np_params = [
+                [p.cpu().numpy() if isinstance(p, torch.Tensor) else p for p in client]
+                for client in model_params
+            ]
+            np_result = robust_aggregate(
+                np_params,
+                strategy="h_fl",
+                losses=_losses,
+                data_sizes=_data_sizes,
+            )
+            return [torch.as_tensor(p, device=self.device) for p in np_result]
 
         # ── ResilAgg: novel two-stage MAD-filtered quality-aware aggregation ──
         if strategy == "resil_agg":
@@ -265,6 +437,7 @@ class AdaptiveFLController:
         print(f"  FedProx: {'Enabled (mu=' + str(self.mu) + ')' if self.use_fedprox else 'Disabled'}")
         print(f"  Aggregation: {self.aggregation_strategy}" +
               (f" (Byzantine tolerance: {self.num_byzantine})" if self.num_byzantine > 0 else ""))
+        print(f"  Prioritized Replay: {'Enabled (alpha=' + str(self.replay_alpha) + ', blend=' + str(self.replay_blend_ratio) + ')' if self.use_prioritized_replay else 'Disabled'}")
 
         self.current_lr = self.learning_rate
         patience_counter = 0
@@ -280,16 +453,34 @@ class AdaptiveFLController:
             for i in range(self.num_intersections):
                 self.local_models[i].set_parameters_gpu(global_params_gpu)
 
-            # Local training at each client with FedProx
+            # Local training at each client with FedProx + Prioritized Replay
             for intersection_id, (features, labels) in training_data.items():
                 model = self.local_models[intersection_id]
-                data_sizes.append(len(features))
+
+                # ── Novelty 3: Prioritized Experience Replay ─────────────────
+                # Blend current data with replayed high-error samples so the
+                # model aggressively re-trains on rare congestion corner-cases.
+                train_features = features
+                train_labels   = labels
+
+                if (self.use_prioritized_replay
+                        and intersection_id in self.replay_buffers
+                        and self.replay_buffers[intersection_id].is_ready(min_samples=64)):
+
+                    buf = self.replay_buffers[intersection_id]
+                    n_replay = max(16, int(len(features) * self.replay_blend_ratio))
+                    r_feat, r_labs = buf.sample(n_replay)
+
+                    # Concatenate replay samples with current round data
+                    train_features = np.concatenate([features, r_feat], axis=0)
+                    train_labels   = np.concatenate([labels,   r_labs], axis=0)
+
+                data_sizes.append(len(features))  # only count real samples for weighting
 
                 # Train locally with current learning rate and FedProx
-                # batch_size=32: small dataset (1000 samples) → 32 gradient updates/epoch
                 model, loss_history = train_model(
                     model,
-                    (features, labels),
+                    (train_features, train_labels),
                     epochs=self.local_epochs,
                     batch_size=32,
                     learning_rate=self.current_lr,
@@ -302,6 +493,16 @@ class AdaptiveFLController:
 
                 self.local_models[intersection_id] = model
                 round_losses.append(loss_history[-1])
+
+                # ── Update replay buffer with per-sample errors ───────────────
+                if self.use_prioritized_replay and intersection_id in self.replay_buffers:
+                    errors = compute_per_sample_errors(
+                        model, features, labels, self.device
+                    )
+                    self.replay_buffers[intersection_id].add_batch(
+                        features, labels, errors
+                    )
+
                 # Collect GPU tensors — no CPU roundtrip
                 model_params.append(model.get_parameters_gpu())
 

@@ -22,6 +22,18 @@ import warnings
 from typing import List, Optional, Tuple
 from enum import Enum
 
+# Import GPU-accelerated distance backend.
+# Falls back gracefully to torch.cdist (GPU) or numpy loops (CPU).
+try:
+    from federated_learning.cuda_krum import compute_model_distances as _gpu_distances
+    _USE_GPU_DISTANCES = True
+except ImportError:
+    try:
+        from cuda_krum import compute_model_distances as _gpu_distances
+        _USE_GPU_DISTANCES = True
+    except ImportError:
+        _USE_GPU_DISTANCES = False
+
 
 class AggregationStrategy(Enum):
     """Available aggregation strategies."""
@@ -31,6 +43,7 @@ class AggregationStrategy(Enum):
     KRUM = "krum"
     MULTI_KRUM = "multi_krum"
     RESIL_AGG = "resil_agg"
+    H_FL = "h_fl"             # Hierarchical Byzantine-Robust FL
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -50,9 +63,16 @@ def _compute_distances(model_params: List[List[np.ndarray]]) -> np.ndarray:
     """
     Pairwise Euclidean distance matrix (used by Krum / Multi-Krum).
 
+    Dispatches to the GPU-accelerated backend (custom CUDA kernel or
+    torch.cdist) when available, falling back to a NumPy loop otherwise.
+
     Returns:
         n_clients × n_clients float32 distance matrix
     """
+    if _USE_GPU_DISTANCES:
+        return _gpu_distances(model_params)
+
+    # CPU fallback
     flattened = _flatten_params(model_params)
     n = flattened.shape[0]
     distances = np.zeros((n, n), dtype=np.float32)
@@ -496,10 +516,28 @@ def robust_aggregate(
             mad_threshold=kwargs.get("mad_threshold", 3.0),
         )
 
+    elif strategy == "h_fl":
+        # Hierarchical FL: lazy import to avoid circular dependency
+        try:
+            from federated_learning.hierarchical import hierarchical_aggregate
+        except ImportError:
+            from hierarchical import hierarchical_aggregate
+        n = len(model_params)
+        return hierarchical_aggregate(
+            model_params=model_params,
+            losses=kwargs.get("losses",     [1.0] * n),
+            data_sizes=kwargs.get("data_sizes", [1] * n),
+            num_intersections=n,
+            fog_strategy=kwargs.get("fog_strategy", "resil_agg"),
+            cloud_strategy=kwargs.get("cloud_strategy", "multi_krum"),
+            num_clusters=kwargs.get("num_clusters", 3),
+        )
+
     else:
         raise ValueError(
             f"Unknown aggregation strategy: '{strategy}'. "
-            "Choose from: fedavg, median, trimmed_mean, krum, multi_krum, resil_agg"
+            "Choose from: fedavg, median, trimmed_mean, krum, multi_krum, "
+            "resil_agg, h_fl"
         )
 
 
